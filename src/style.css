@@ -743,6 +743,29 @@ h2 {
   margin-top: clamp(1.5rem, 3vw, 2.4rem);
 }
 
+/* Method column headers — mirrors .demo-row-videos' grid so each label lands
+   dead-center over its column of videos. Brighter/larger than the quiet mono
+   labels elsewhere: these carry the table's structure, not decoration. */
+.method-header {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(.8rem, 1.6vw, 1.4rem);
+  padding-bottom: .7rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink);
+  font: 500 clamp(.72rem, 1vw, .84rem)/1 'DM Mono', monospace;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+/* "Ours" column gets the signal-blue accent — same vocabulary as the impact
+   strip numbers — so the reader's eye lands on it first. */
+.method-header .is-ours {
+  color: var(--signal);
+  text-shadow: 0 0 16px rgba(77, 139, 255, .5);
+}
+
 .demo-row {
   display: flex;
   flex-direction: column;
@@ -1202,8 +1225,14 @@ h2 {
 
   /* Three method columns get cramped between phone and desktop — drop to two
      (rows keep their trio, it just wraps). */
-  .demo-row-videos {
+  .demo-row-videos,
+  .method-header {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Header has 3 labels for 2 columns — the trio wraps like the videos do. */
+  .method-header {
+    text-align: left;
   }
 
   .abstract-title {
@@ -1312,7 +1341,8 @@ h2 {
   }
 
   .video-gallery,
-  .demo-row-videos {
+  .demo-row-videos,
+  .method-header {
     grid-template-columns: 1fr;
   }
 

@@ -2,7 +2,6 @@
 import { onBeforeUnmount, onMounted, ref, type Directive } from 'vue'
 import 'katex/dist/katex.min.css'
 import renderMathInElement from 'katex/contrib/auto-render'
-import promptsRaw from '../docs/prompts.txt?raw'
 
 type Demo = {
   id: string
@@ -38,52 +37,73 @@ const modelOrder = [
   'Wan2.2-T2V-A14B-720P-97',
 ]
 
-const allVideos = import.meta.glob('../docs/videos/*/*/*.mp4', {
+const allVideos = import.meta.glob('../docs/videos-real/*/*/*.mp4', {
   eager: true,
   import: 'default',
 }) as Record<string, string>
 
-// One prompt per gallery row, Nth line ↔ Nth row (shared across all model
-// blocks — every model renders the same four prompts). Shortfalls fall back
-// to a placeholder so an incomplete prompts.txt never blanks the row label.
-const promptLines = promptsRaw.split(/\r?\n/).filter((line) => line.trim() !== '')
-const rowPrompt = (row: number) =>
-  promptLines[row]?.trim() || `[ Add the original input prompt for row ${row + 1} ]`
+// Prompts live per model: videos-real/<model>/prompts.txt, one prompt per
+// gallery row (Nth line ↔ Nth row). Missing file or short file falls back to
+// a placeholder so a row label never blanks.
+const promptsByModel = import.meta.glob('../docs/videos-real/*/prompts.txt', {
+  eager: true,
+  import: 'default',
+}) as Record<string, string>
+
+const modelPrompts = (model: string) => {
+  const raw = Object.entries(promptsByModel).find(([p]) => p.includes(`/${model}/`))?.[1] ?? ''
+  return raw.split(/\r?\n/).filter((line) => line.trim() !== '')
+}
+
+const rowPrompt = (model: string, row: number) =>
+  modelPrompts(model)[row]?.trim() ||
+  `[ Add the original input prompt for ${model} row ${row + 1} ]`
 
 type MethodCell = { method: (typeof methodOrder)[number]; label: string; source: string }
 type GalleryRow = { key: string; prompt: string; cells: MethodCell[] }
 type ModelBlock = { model: string; rows: GalleryRow[] }
 
+// Row grouping key — methods name the same prompt differently (e.g. Ours
+// "06_seed42.mp4" vs Turbo Diffusion "prompt_06.mp4"), so rows group by the
+// first digit-run in the filename instead of the raw stem: both normalize
+// to "06" and land on the same row.
+const rowKeyOf = (file: string) => file.match(/\d+/)?.[0] ?? file
+
 const modelBlocks: ModelBlock[] = modelOrder
   .map((model) => {
-    // Buckets: row key (filename stem) → method → resolved URL. Glob keys are
-    // sorted, so stems that share a row stay in file order within a method.
+    // Buckets: row key → method → resolved URL. Glob keys are sorted, so files
+    // that share a row stay in file order within a method.
     const buckets = new Map<string, Map<string, string[]>>()
     for (const [path, source] of Object.entries(allVideos)) {
-      const [, m, method, file] = path.split('/')
+      const [m, method, file] = path.split('/').slice(-3)
       if (m !== model) continue
-      const stem = file.replace(/\.mp4$/, '')
-      let byMethod = buckets.get(stem)
-      if (!byMethod) buckets.set(stem, (byMethod = new Map()))
+      const rowKey = rowKeyOf(file)
+      let byMethod = buckets.get(rowKey)
+      if (!byMethod) buckets.set(rowKey, (byMethod = new Map()))
       const list = byMethod.get(method) ?? []
       list.push(source)
       byMethod.set(method, list)
     }
 
-    const rows: GalleryRow[] = [...buckets.entries()].map(([stem, byMethod], index) => ({
-      key: `${model}-${stem}`,
-      prompt: rowPrompt(index),
-      cells: methodOrder
-        .map((method): MethodCell | null => {
-          const source = byMethod.get(method)?.[0]
-          return source ? { method, label: methodLabels[method], source } : null
-        })
-        .filter((cell): cell is MethodCell => cell !== null),
-    }))
+    // Numeric row order — "2" must come before "10".
+    const rows: GalleryRow[] = [...buckets.entries()]
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .map(([rowKey, byMethod], index) => ({
+        key: `${model}-${rowKey}`,
+        prompt: rowPrompt(model, index),
+        cells: methodOrder
+          .map((method): MethodCell | null => {
+            const source = byMethod.get(method)?.[0]
+            return source ? { method, label: methodLabels[method], source } : null
+          })
+          .filter((cell): cell is MethodCell => cell !== null),
+      }))
 
     return { model, rows }
   })
   .filter((block) => block.rows.length > 0)
+
+console.log(modelBlocks)
 
 const heroDemo = (() => {
   for (const model of modelOrder) {
@@ -363,15 +383,23 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         class="model-block"
         :data-model="block.model"
       >
-        <h3 class="model-title">{{ block.model.replaceAll('-', ' ') }}</h3>
+        <h3 class="model-title">{{ block.model }}</h3>
 
         <div class="model-grid">
+          <!-- Method column headers — same 3-col grid as .demo-row-videos so
+               each label sits exactly over its column of videos. -->
+          <div class="method-header" aria-hidden="true">
+            <span
+              v-for="method in methodOrder"
+              :key="method"
+              :class="{ 'is-ours': method === 'ours' }"
+            >{{ methodLabels[method] }}</span>
+          </div>
           <div
             v-for="row in block.rows"
             :key="row.key"
             class="demo-row"
           >
-            <p class="demo-row-prompt">{{ row.prompt }}</p>
             <div class="demo-row-videos">
               <figure v-for="cell in row.cells" :key="row.key + cell.method" class="video-card">
                 <div
@@ -380,7 +408,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                   @mouseleave="openPromptId = null"
                 >
                   <video :src="cell.source" autoplay muted loop playsinline preload="metadata"></video>
-                  <span class="method-chip">{{ cell.label }}</span>
                   <div class="prompt-overlay" aria-hidden="true">
                     <span>Prompt</span>
                     <p>{{ row.prompt }}</p>
