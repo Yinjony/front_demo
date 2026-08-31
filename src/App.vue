@@ -2,10 +2,11 @@
 import { onBeforeUnmount, onMounted, ref, type Directive } from 'vue'
 import 'katex/dist/katex.min.css'
 import renderMathInElement from 'katex/contrib/auto-render'
+import promptsRaw from '../docs/prompts.txt?raw'
 
 type Demo = {
   id: string
-  number: number
+  label: string
   source: string
   prompt: string
 }
@@ -15,36 +16,119 @@ const openPromptId = ref<string | null>(null)
 const expandedVideo = ref<Demo | null>(null)
 const citationCopied = ref(false)
 
-const videoFiles = import.meta.glob('../docs/videos/*.mp4', {
+/* ===== Demo gallery: per-model blocks × per-prompt rows × per-method columns ==
+   Source tree convention: docs/videos/<model>/<method>/<file>.mp4 — one glob
+   picks up everything, then rows group by filename-stem so the same prompt's
+   three methods land side by side. Models render in the fixed order below;
+   a model with no files drops out of the gallery automatically.            */
+
+const methodOrder = ['full_attention', 'turbo_diffusion', 'ours'] as const
+const methodLabels: Record<string, string> = {
+  full_attention: 'Full Attention',
+  turbo_diffusion: 'Turbo Diffusion',
+  ours: 'Ours',
+}
+
+const modelOrder = [
+  'Wan2.1-T2V-1.3B-480P-90',
+  'Wan2.1-T2V-14B-480P-90',
+  'Wan2.1-T2V-14B-720P-95',
+  'Wan2.1-I2V-14B-720P-95',
+  'Wan2.2-T2V-A14B-480P-95',
+  'Wan2.2-T2V-A14B-720P-97',
+]
+
+const allVideos = import.meta.glob('../docs/videos/*/*/*.mp4', {
   eager: true,
   import: 'default',
 }) as Record<string, string>
 
-const videoPath = (number: number) =>
-  `../docs/videos/personal_lihaoyu_0730_14b_sla_distill_4step_${number}.mp4`
+// One prompt per gallery row, Nth line ↔ Nth row (shared across all model
+// blocks — every model renders the same four prompts). Shortfalls fall back
+// to a placeholder so an incomplete prompts.txt never blanks the row label.
+const promptLines = promptsRaw.split(/\r?\n/).filter((line) => line.trim() !== '')
+const rowPrompt = (row: number) =>
+  promptLines[row]?.trim() || `[ Add the original input prompt for row ${row + 1} ]`
 
-const videoSource = (number: number) => videoFiles[videoPath(number)] ?? ''
+type MethodCell = { method: (typeof methodOrder)[number]; label: string; source: string }
+type GalleryRow = { key: string; prompt: string; cells: MethodCell[] }
+type ModelBlock = { model: string; rows: GalleryRow[] }
 
-// Discover demo numbers from the actual files so the gallery always mirrors
-// whatever lives in docs/videos — no hard-coded count to drift out of sync.
-const demoNumbers = Object.keys(videoFiles)
-  .map((path) => path.match(/_4step_(\d+)\.mp4$/)?.[1])
-  .filter((value): value is string => Boolean(value))
-  .map(Number)
-  .sort((a, b) => a - b)
+const modelBlocks: ModelBlock[] = modelOrder
+  .map((model) => {
+    // Buckets: row key (filename stem) → method → resolved URL. Glob keys are
+    // sorted, so stems that share a row stay in file order within a method.
+    const buckets = new Map<string, Map<string, string[]>>()
+    for (const [path, source] of Object.entries(allVideos)) {
+      const [, m, method, file] = path.split('/')
+      if (m !== model) continue
+      const stem = file.replace(/\.mp4$/, '')
+      let byMethod = buckets.get(stem)
+      if (!byMethod) buckets.set(stem, (byMethod = new Map()))
+      const list = byMethod.get(method) ?? []
+      list.push(source)
+      byMethod.set(method, list)
+    }
 
-const heroNumber = demoNumbers.includes(20) ? 20 : demoNumbers[demoNumbers.length - 1] ?? 1
-const heroVideo = videoSource(heroNumber)
+    const rows: GalleryRow[] = [...buckets.entries()].map(([stem, byMethod], index) => ({
+      key: `${model}-${stem}`,
+      prompt: rowPrompt(index),
+      cells: methodOrder
+        .map((method): MethodCell | null => {
+          const source = byMethod.get(method)?.[0]
+          return source ? { method, label: methodLabels[method], source } : null
+        })
+        .filter((cell): cell is MethodCell => cell !== null),
+    }))
+
+    return { model, rows }
+  })
+  .filter((block) => block.rows.length > 0)
+
+const heroDemo = (() => {
+  for (const model of modelOrder) {
+    for (const method of methodOrder) {
+      const hit = Object.entries(allVideos).find(([p]) => p.includes(`/${model}/${method}/`))
+      if (hit) return { label: `${model} / ${methodLabels[method]}`, source: hit[1] }
+    }
+  }
+  return null
+})()
 const paperUrl = new URL('../docs/论文.pdf', import.meta.url).href
 
-const demos: Demo[] = demoNumbers.map((number) => ({
-  id: `demo-${number}`,
-  number,
-  source: videoSource(number),
-  prompt: `[ Add the original input prompt for demo ${String(number).padStart(2, '0')} ]`,
-}))
+// End-to-end latency benchmarks from docs/5090测试.docx — RTX 5090, fp8 W8A8,
+// 4-step, 81 frames @ 16 fps (5.06 s), single prompt, SLA only.
+// 2.1 latency = full denoise loop; 2.2 = forward compute + expert swap,
+// excluding model load/unload and VAE. BENCHMARK=1 warmup everywhere, so
+// torch.compile overhead is excluded.
+type BenchRow = {
+  model: string
+  task: string
+  grid: string
+  topk: string
+  sparsity: string
+  latency: string
+  breakdown: string
+}
 
-function openVideo(demo: Demo) {
+const benchRows: BenchRow[] = [
+  { model: 'Wan2.1', task: 't2v-1.3B-480p', grid: '832×480', topk: '0.1', sparsity: '90%', latency: '1.77', breakdown: '0.44 s/step' },
+  { model: 'Wan2.1', task: 't2v-14B-480p', grid: '832×480', topk: '0.1', sparsity: '90%', latency: '11.03', breakdown: '2.76 s/step' },
+  { model: 'Wan2.1', task: 't2v-14B-720p', grid: '1280×720', topk: '0.05', sparsity: '95%', latency: '26.43', breakdown: '6.61 s/step' },
+  { model: 'Wan2.1', task: 'i2v-14B-720p', grid: '1296×704', topk: '0.05', sparsity: '95%', latency: '26.53', breakdown: '6.63 s/step' },
+  { model: 'Wan2.2', task: 't2v-A14B-480p', grid: '832×480', topk: '0.1', sparsity: '90%', latency: '17.87', breakdown: 'compute 11.09 s + swap 6.78 s' },
+  { model: 'Wan2.2', task: 't2v-A14B-480p', grid: '832×480', topk: '0.05', sparsity: '95%', latency: '16.96', breakdown: 'compute 9.92 s + swap 7.04 s' },
+  { model: 'Wan2.2', task: 't2v-A14B-720p', grid: '1280×720', topk: '0.03', sparsity: '97%', latency: '31.14', breakdown: 'compute 23.99 s + swap 7.16 s' },
+]
+
+const benchStats = [
+  { value: '6 . 2 ×', label: '1.3B vs 14B speedup at 480p / 90% sparsity' },
+  { value: '0 . 4 %', label: 'i2v vs t2v cost gap at equal pixel budget (720p)' },
+  { value: '− 1 0 . 5 %', label: 'forward compute from 90% → 95% sparsity (2.2, 480p)' },
+]
+
+function openVideo(demo: Demo | null) {
+  if (!demo) return
   expandedVideo.value = demo
 }
 
@@ -104,7 +188,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     <section id="top" class="hero">
       <video
         class="hero-film"
-        :src="heroVideo"
+        :src="heroDemo?.source"
         autoplay
         muted
         loop
@@ -132,6 +216,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
         <div class="nav-links" :class="{ 'is-open': menuOpen }">
           <a href="#abstract" @click="menuOpen = false">Abstract</a>
+          <a href="#benchmarks" @click="menuOpen = false">Benchmarks</a>
           <a href="#demos" @click="menuOpen = false">Demos</a>
           <a href="#citation" @click="menuOpen = false">Citation</a>
           <a class="nav-action" :href="paperUrl" target="_blank" rel="noreferrer" @click="menuOpen = false">
@@ -162,11 +247,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </div>
 
       <button
+        v-if="heroDemo"
         class="expand-button hero-expand"
         type="button"
         aria-label="Expand hero video"
         title="Expand video"
-        @click="openVideo({ id: 'hero', number: heroNumber, source: heroVideo, prompt: 'Hero background video' })"
+        @click="openVideo({ id: 'hero', label: heroDemo.label, source: heroDemo.source, prompt: 'Hero background video' })"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
           <path d="M15 3h6v6M21 3l-7 7M9 21H3v-6M3 21l7-7" />
@@ -212,6 +298,58 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </div>
     </section>
 
+    <section id="benchmarks" class="bench-section page-width">
+      <div class="demos-heading">
+        <div>
+          <h2>Benchmarks</h2>
+        </div>
+<!--        <p class="bench-lede">-->
+<!--          End-to-end SLA latency sweeps on a single RTX 5090 (fp8 W8A8, 4-step, 81 frames @ 16 fps-->
+<!--          ≈ 5.06 s clips, single prompt). Wan2.1 numbers cover the full denoise loop; Wan2.2 splits-->
+<!--          into forward compute + expert swap.-->
+<!--        </p>-->
+      </div>
+
+      <div class="bench-table-wrap">
+        <table class="bench-table">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Task</th>
+              <th>Grid</th>
+              <th>top-k</th>
+              <th>Sparsity</th>
+              <th>Latency</th>
+              <th>Breakdown</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in benchRows" :key="`${row.model}-${row.task}-${row.sparsity}`">
+              <td>{{ row.model }}</td>
+              <td>{{ row.task }}</td>
+              <td>{{ row.grid }}</td>
+              <td>{{ row.topk }}</td>
+              <td>{{ row.sparsity }}</td>
+              <td class="bench-latency">{{ row.latency }} s</td>
+              <td class="bench-breakdown">{{ row.breakdown }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="impact-strip bench-strip" aria-label="Key benchmark observations">
+        <div v-for="stat in benchStats" :key="stat.label">
+          <strong>{{ stat.value }}</strong>
+          <span>{{ stat.label }}</span>
+        </div>
+      </div>
+
+<!--      <p class="bench-foot">-->
+<!--        All runs warmed up (BENCHMARK=1) so torch.compile overhead is excluded; seven tasks run-->
+<!--        serially on an otherwise idle GPU.-->
+<!--      </p>-->
+    </section>
+
     <section id="demos" class="demos-section page-width">
       <div class="demos-heading">
         <div>
@@ -219,38 +357,57 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </div>
       </div>
 
-      <div class="video-gallery">
-        <figure v-for="demo in demos" :key="demo.id" class="video-card">
+      <div
+        v-for="block in modelBlocks"
+        :key="block.model"
+        class="model-block"
+        :data-model="block.model"
+      >
+        <h3 class="model-title">{{ block.model.replaceAll('-', ' ') }}</h3>
+
+        <div class="model-grid">
           <div
-            class="demo-frame"
-            :class="{ 'is-prompt-open': openPromptId === demo.id }"
-            @mouseleave="openPromptId = null"
+            v-for="row in block.rows"
+            :key="row.key"
+            class="demo-row"
           >
-            <video :src="demo.source" autoplay muted loop playsinline preload="metadata"></video>
-            <div class="prompt-overlay" aria-hidden="true">
-              <span>Prompt</span>
-              <p>{{ demo.prompt }}</p>
+            <p class="demo-row-prompt">{{ row.prompt }}</p>
+            <div class="demo-row-videos">
+              <figure v-for="cell in row.cells" :key="row.key + cell.method" class="video-card">
+                <div
+                  class="demo-frame"
+                  :class="{ 'is-prompt-open': openPromptId === row.key + cell.method }"
+                  @mouseleave="openPromptId = null"
+                >
+                  <video :src="cell.source" autoplay muted loop playsinline preload="metadata"></video>
+                  <span class="method-chip">{{ cell.label }}</span>
+                  <div class="prompt-overlay" aria-hidden="true">
+                    <span>Prompt</span>
+                    <p>{{ row.prompt }}</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="prompt-button"
+                    :aria-pressed="openPromptId === row.key + cell.method"
+                    :aria-label="openPromptId === row.key + cell.method ? 'Hide prompt' : 'Show prompt'"
+                    @click.stop="togglePrompt(row.key + cell.method)"
+                  >Prompt</button>
+                  <button
+                    type="button"
+                    class="expand-button"
+                    :aria-label="`Expand ${cell.label} video — ${row.prompt}`"
+                    :title="cell.label"
+                    @click.stop="openVideo({ id: row.key + cell.method, label: `${block.model} · ${cell.label}`, source: cell.source, prompt: row.prompt })"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
+                      <path d="M15 3h6v6M21 3l-7 7M9 21H3v-6M3 21l7-7" />
+                    </svg>
+                  </button>
+                </div>
+              </figure>
             </div>
-            <button
-              type="button"
-              class="prompt-button"
-              :aria-pressed="openPromptId === demo.id"
-              :aria-label="openPromptId === demo.id ? 'Hide prompt' : 'Show prompt'"
-              @click.stop="togglePrompt(demo.id)"
-            >Prompt</button>
-            <button
-              type="button"
-              class="expand-button"
-              aria-label="Expand demo video"
-              title="Expand video"
-              @click.stop="openVideo(demo)"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
-                <path d="M15 3h6v6M21 3l-7 7M9 21H3v-6M3 21l7-7" />
-              </svg>
-            </button>
           </div>
-        </figure>
+        </div>
       </div>
     </section>
 
@@ -288,7 +445,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </button>
       <div class="lightbox-stage" @click.stop>
         <video :src="expandedVideo.source" autoplay muted loop playsinline controls></video>
-        <p>{{ expandedVideo.number === heroNumber && expandedVideo.id === 'hero' ? 'Hero background video' : `Demo ${String(expandedVideo.number).padStart(2, '0')}` }}</p>
+        <p>{{ expandedVideo.id === 'hero' ? 'Hero background video' : expandedVideo.label }}</p>
       </div>
     </div>
   </main>
