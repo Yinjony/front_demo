@@ -43,10 +43,13 @@ const allVideos = import.meta.glob('../docs/videos-real/*/*/*.mp4', {
 }) as Record<string, string>
 
 // Prompts live per model: videos-real/<model>/prompts.txt, one prompt per
-// gallery row (Nth line ↔ Nth row). Missing file or short file falls back to
-// a placeholder so a row label never blanks.
+// gallery row (Nth line ↔ Nth row). query: '?raw' makes the glob return the
+// file TEXT — without it .txt is treated as a static asset and you get the
+// bundled URL instead of the content. Missing file or short file falls back
+// to a placeholder so a row label never blanks.
 const promptsByModel = import.meta.glob('../docs/videos-real/*/prompts.txt', {
   eager: true,
+  query: '?raw',
   import: 'default',
 }) as Record<string, string>
 
