@@ -1,7 +1,16 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, type Directive } from 'vue'
-import 'katex/dist/katex.min.css'
-import renderMathInElement from 'katex/contrib/auto-render'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+import EChart from './components/EChart.vue'
+import FrameworkDiagram from './components/FrameworkDiagram.vue'
+import {
+  headlineOption,
+  latencyOption,
+  radarOption,
+  speedupOption,
+  trapOption,
+  vbenchOption,
+} from './chartOptions'
+import { qualityRows } from './data/paperData'
 
 type Demo = {
   id: string
@@ -14,6 +23,16 @@ const menuOpen = ref(false)
 const openPromptId = ref<string | null>(null)
 const expandedVideo = ref<Demo | null>(null)
 const citationCopied = ref(false)
+
+/* Static option objects — charts don't react to anything, so build once. */
+const latencyOpt = latencyOption()
+const speedupOpt = speedupOption()
+const headlineOpt = headlineOption()
+const trapOpt = trapOption()
+const vbenchOpt = vbenchOption()
+const radarOpt = radarOption()
+
+const qualityModels = [...new Set(qualityRows.map((r) => r.model))]
 
 /* ===== Demo gallery: per-model blocks × per-prompt rows × per-method columns ==
    Source tree convention: docs/videos/<model>/<method>/<file>.mp4 — one glob
@@ -106,8 +125,6 @@ const modelBlocks: ModelBlock[] = modelOrder
   })
   .filter((block) => block.rows.length > 0)
 
-console.log(modelBlocks)
-
 const heroDemo = (() => {
   for (const model of modelOrder) {
     for (const method of methodOrder) {
@@ -118,37 +135,6 @@ const heroDemo = (() => {
   return null
 })()
 const paperUrl = new URL('../docs/论文.pdf', import.meta.url).href
-
-// End-to-end latency benchmarks from docs/5090测试.docx — RTX 5090, fp8 W8A8,
-// 4-step, 81 frames @ 16 fps (5.06 s), single prompt, SLA only.
-// 2.1 latency = full denoise loop; 2.2 = forward compute + expert swap,
-// excluding model load/unload and VAE. BENCHMARK=1 warmup everywhere, so
-// torch.compile overhead is excluded.
-type BenchRow = {
-  model: string
-  task: string
-  grid: string
-  topk: string
-  sparsity: string
-  latency: string
-  breakdown: string
-}
-
-const benchRows: BenchRow[] = [
-  { model: 'Wan2.1', task: 't2v-1.3B-480p', grid: '832×480', topk: '0.1', sparsity: '90%', latency: '1.77', breakdown: '0.44 s/step' },
-  { model: 'Wan2.1', task: 't2v-14B-480p', grid: '832×480', topk: '0.1', sparsity: '90%', latency: '11.03', breakdown: '2.76 s/step' },
-  { model: 'Wan2.1', task: 't2v-14B-720p', grid: '1280×720', topk: '0.05', sparsity: '95%', latency: '26.43', breakdown: '6.61 s/step' },
-  { model: 'Wan2.1', task: 'i2v-14B-720p', grid: '1296×704', topk: '0.05', sparsity: '95%', latency: '26.53', breakdown: '6.63 s/step' },
-  { model: 'Wan2.2', task: 't2v-A14B-480p', grid: '832×480', topk: '0.1', sparsity: '90%', latency: '17.87', breakdown: 'compute 11.09 s + swap 6.78 s' },
-  { model: 'Wan2.2', task: 't2v-A14B-480p', grid: '832×480', topk: '0.05', sparsity: '95%', latency: '16.96', breakdown: 'compute 9.92 s + swap 7.04 s' },
-  { model: 'Wan2.2', task: 't2v-A14B-720p', grid: '1280×720', topk: '0.03', sparsity: '97%', latency: '31.14', breakdown: 'compute 23.99 s + swap 7.16 s' },
-]
-
-const benchStats = [
-  { value: '6 . 2 ×', label: '1.3B vs 14B speedup at 480p / 90% sparsity' },
-  { value: '0 . 4 %', label: 'i2v vs t2v cost gap at equal pixel budget (720p)' },
-  { value: '− 1 0 . 5 %', label: 'forward compute from 90% → 95% sparsity (2.2, 480p)' },
-]
 
 function openVideo(demo: Demo | null) {
   if (!demo) return
@@ -169,9 +155,15 @@ function scrollToId(id: string) {
   document.getElementById(id)?.scrollIntoView()
 }
 
-async function copyCitation() {
-  const citation = `@article{liu2026ropeslr,\n  title={RoPeSLR: 3D RoPE-driven Sparse-LowRank Attention for Efficient Diffusion Transformers},\n  author={Liu, Yuxi and Zhang, Zekun and Cai, Yixiang and Deng, Renjia and He, Yutong and Yuan, Kun},\n  journal={arXiv preprint arXiv:2605.20659},\n  year={2026}\n}`
+const citation = `@article{liu2026sparkdiffusion,
+  title   = {SparkDiffusion: Mitigating the High-Sparsity Trap --- A Unified Framework for 200x Single-GPU Acceleration of Visual Generation},
+  author  = {Liu, Yuxi and Li, Haoyu and Zhang, Zekun and Sun, Tengxu and Cai, Yixiang and Li, Jiayong and Xia, Yifei and Ai, Baole and Wang, Ang and Wang, Jiamang and Qu, Lin and Zhang, Kai and Yuan, Kun and Cui, Bin},
+  journal = {Preprint},
+  year    = {2026},
+  url     = {https://SparkDiffusion.com}
+}`
 
+async function copyCitation() {
   try {
     await navigator.clipboard.writeText(citation)
     citationCopied.value = true
@@ -183,23 +175,6 @@ async function copyCitation() {
 
 function onKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') closeVideo()
-}
-
-// KaTeX auto-render directive. Drop v-math on any element whose text contains
-// inline ($...$) or display ($$...$$, \[...\]) LaTeX and it renders in place.
-// Runs once on mount — fine for static prose like the abstract.
-const vMath: Directive<HTMLElement> = {
-  mounted(el) {
-    renderMathInElement(el, {
-      delimiters: [
-        { left: '$$', right: '$$', display: true },
-        { left: '\\[', right: '\\]', display: true },
-        { left: '$', right: '$', display: false },
-        { left: '\\(', right: '\\)', display: false },
-      ],
-      throwOnError: false,
-    })
-  },
 }
 
 onMounted(() => window.addEventListener('keydown', onKeydown))
@@ -224,7 +199,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
       <nav class="nav" aria-label="Primary navigation">
         <a class="brand" href="#top" aria-label="Project home">
-          <span>RoPeSLR</span>
+          <span>SparkDiffusion</span>
         </a>
 
         <button
@@ -239,7 +214,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
         <div class="nav-links" :class="{ 'is-open': menuOpen }">
           <a href="#abstract" @click="menuOpen = false">Abstract</a>
-          <a href="#benchmarks" @click="menuOpen = false">Benchmarks</a>
+          <a href="#method" @click="menuOpen = false">Method</a>
+          <a href="#benchmarks" @click="menuOpen = false">Results</a>
           <a href="#demos" @click="menuOpen = false">Demos</a>
           <a href="#citation" @click="menuOpen = false">Citation</a>
           <a class="nav-action" :href="paperUrl" target="_blank" rel="noreferrer" @click="menuOpen = false">
@@ -259,14 +235,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </nav>
 
       <div class="hero-copy page-width">
-        <p class="kicker">ICLR· 2026</p>
-        <h1>RoPeSLR:<br /><span>3D RoPE-driven Sparse-LowRank Attention for Efficient Diffusion Transformers</span></h1>
+        <p class="kicker">SparkDiffusion · 2026</p>
+        <h1>SparkDiffusion:<br /><span>Mitigating the High-Sparsity Trap — A Unified Framework for 200× Single-GPU Acceleration of Visual Generation</span></h1>
         <p class="hero-lede">
-          A 3D RoPE-driven sparse-low-rank attention framework that restores global context at extreme
-          sparsity, making ultra-long video diffusion substantially more efficient.
+          A unified post-training framework — compensated sparse attention, trajectory-mixed
+          distillation, and fused FP8 deployment — that turns dense video DiTs into high-sparsity,
+          few-step generators with up to 265× measured end-to-end speedup on a single GPU.
         </p>
-        <p class="authors">Yuxi Liu<sup>*</sup> <i>·</i> Zekun Zhang<sup>*</sup> <i>·</i> Yixiang Cai<sup>*</sup> <i>·</i> Renjia Deng <i>·</i> Yutong He <i>·</i> Kun Yuan<sup>†</sup></p>
-        <p class="affiliation">Pku Melon</p>
+        <p class="authors">
+          Yuxi Liu<sup>*1,4</sup> <i>·</i> Haoyu Li<sup>*2,4</sup> <i>·</i> Zekun Zhang<sup>*1</sup> <i>·</i> Tengxu Sun<sup>†4</sup> <i>·</i> Yixiang Cai<sup>1</sup> <i>·</i> Jiayong Li<sup>3,4</sup> <i>·</i> Yifei Xia<sup>5</sup> <i>·</i> Baole Ai<sup>4</sup> <i>·</i> Ang Wang<sup>4</sup> <i>·</i> Jiamang Wang<sup>4</sup> <i>·</i> Lin Qu<sup>4</sup> <i>·</i> Kai Zhang<sup>2</sup> <i>·</i> Kun Yuan<sup>†1</sup> <i>·</i> Bin Cui<sup>†5</sup>
+        </p>
+        <p class="affiliation">
+          <sup>1</sup>Peking University, Melon Group <i>·</i> <sup>2</sup>Tsinghua University <i>·</i> <sup>3</sup>Harbin Institute of Technology <i>·</i> <sup>4</sup>Alibaba Group <i>·</i> <sup>5</sup>Peking University
+        </p>
+        <p class="affiliation-note">* Equal contribution &nbsp;·&nbsp; † Corresponding author</p>
       </div>
 
       <button
@@ -287,7 +269,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         type="button"
         aria-label="Continue to abstract"
         @click="scrollToId('abstract')"
-      ><span>Let's go RoPeSLR</span><b aria-hidden="true"></b></button>
+      ><span>Let's go SparkDiffusion</span><b aria-hidden="true"></b></button>
     </section>
 
     <section id="abstract" class="abstract-section page-width">
@@ -295,82 +277,187 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         <h2>Abstract</h2>
       </div>
       <div class="abstract-copy">
-        <p v-math>
-          Diffusion Transformers (DiTs) have revolutionized high-fidelity video generation, yet their $O(L^2)$
-          attention complexity poses a formidable bottleneck for long-sequence synthesis. While recent sparse-linear
-          attention hybrids aim to mitigate this, their performance severely degrades at extreme sparsity due
-          to the "RoPE Dilemma": standard linear attention fails to preserve the orthogonal relative-position
-          structure of 3D Rotary Position Embeddings (RoPE), neutralizing vital distance awareness. To address
-          this, we propose <b>RoPeSLR</b>, a 3D RoPE-guided Sparse-LowRank attention framework. We establish
-          that under empirically validated assumptions, the DiT attention manifold admits a decoupling into a
-          high-frequency semantic spike set (bounded by $O(L^{3/2})$ sparsity) and an extreme low-rank ($O(d_h \log L)$)
-          background continuum. Guided by this structural prior, RoPeSLR eschews standard linear attention for
-          a head-wise low-rank parameterization equipped with a learnable 3D Absolute Positional Embedding
-          (PE) injection, seamlessly synthesizing long-range relative distance decay. By guaranteeing sub-quadratic
-          sparsity and sub-linear rank growth, RoPeSLR is exceptionally suited for scaling to ultra-long video
-          inference. Extensive evaluations validate this scalable superiority: at 90% sparsity, RoPeSLR achieves up
-          to 10× fewer FLOPs on Wan2.1-1.3B and delivers a 2.26× end-to-end inference speedup on the ultra-long
-          100K+ token sequences of HunyuanVideo-13B, all while maintaining near-lossless generation fidelity (less
-          than 1.3% average VBench degradation)
+        <p>
+          Video diffusion transformers are central to high-quality visual generation, but their
+          inference cost is dominated by attention over long spatiotemporal token sequences. We
+          identify the <b>high-sparsity trap</b>: at extreme sparsity, step-local objectives may
+          optimize per-step velocities while leaving terminal-visible structural errors. These
+          errors are injected during high-noise structure generation and accumulated by later
+          sampling steps, so low-noise refinement alone is insufficient. To address this, we present
+          <b>SparkDiffusion</b>, a unified framework that converts dense video DiTs into
+          high-sparsity, few-step generators. SparkDiffusion combines compensated sparse attention,
+          trajectory-mixed distillation, and fused FP8 deployment: a short sparse warm-up provides a
+          coarse generative prior, trajectory-mixed distillation combines high-noise structural
+          alignment with low-noise terminal distribution matching, and fused FP8 kernels convert
+          saved computation into wall-clock speedup. Across multiple Wan models, resolutions, and
+          sparsity levels up to 97%, SparkDiffusion maintains strong generation quality while
+          delivering large measured speedups.
         </p>
         <div class="impact-strip" aria-label="Key results from the paper">
-          <div><strong>1 0 ×</strong><span>fewer FLOPs on Wan2.1-1.3B</span></div>
-          <div><strong>2 . 2 6 ×</strong><span>faster end-to-end inference on 100K+ tokens</span></div>
-          <div><strong>&lt; 1 . 3 %</strong><span>average VBench degradation</span></div>
+          <div><strong>200×</strong><span>end-to-end speedup on Wan2.2-T2V-720P at 97% attention sparsity</span></div>
+          <div><strong>1.6 s</strong><span>per Wan2.1-T2V-1.3B-480P video on a single RTX 5090</span></div>
+          <div><strong>97%</strong><span>attention sparsity with dense-comparable generation quality</span></div>
         </div>
       </div>
+    </section>
+
+    <section id="method" class="method-section page-width">
+      <div class="demos-heading">
+        <div>
+          <h2>Method</h2>
+        </div>
+        <p>
+          Three post-training stages plus a deployment step convert one pretrained dense video DiT
+          into a high-sparsity, few-step generator — without retraining from scratch. Stage 1
+          warms up the compensated sparse architecture into a coarse prior; stage 2 distills the
+          trajectory with high-noise structural alignment and low-noise distribution matching;
+          stage 3 quantizes to fused FP8 kernels for real wall-clock gains.
+        </p>
+      </div>
+
+      <figure class="figure-card method-figure">
+        <div class="figure-head">
+          <h3>SparkDiffusion framework overview</h3>
+          <span class="figure-tag">Figure 9 · rebuilt</span>
+        </div>
+        <FrameworkDiagram />
+        <figcaption class="figure-note">
+          Sparse warm-up provides a coarse prior; trajectory-mixed distillation combines high-noise
+          structural alignment with low-noise distribution matching; FP8 quantization with fused
+          kernels converts saved computation into inference speedup.
+        </figcaption>
+      </figure>
     </section>
 
     <section id="benchmarks" class="bench-section page-width">
       <div class="demos-heading">
         <div>
-          <h2>Benchmarks</h2>
+          <h2>Results</h2>
         </div>
-<!--        <p class="bench-lede">-->
-<!--          End-to-end SLA latency sweeps on a single RTX 5090 (fp8 W8A8, 4-step, 81 frames @ 16 fps-->
-<!--          ≈ 5.06 s clips, single prompt). Wan2.1 numbers cover the full denoise loop; Wan2.2 splits-->
-<!--          into forward compute + expert swap.-->
-<!--        </p>-->
+        <p>
+          End-to-end latency, speedup, and generation quality across Wan models, resolutions, and
+          sparsity levels up to 97% — measured on NVIDIA H100 and RTX 5090 GPUs. All charts are
+          interactive re-drawings of the paper's figures from the reported numbers.
+        </p>
       </div>
 
-      <div class="bench-table-wrap">
-        <table class="bench-table">
-          <thead>
-            <tr>
-              <th>Model</th>
-              <th>Task</th>
-              <th>Grid</th>
-              <th>top-k</th>
-              <th>Sparsity</th>
-              <th>Latency</th>
-              <th>Breakdown</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in benchRows" :key="`${row.model}-${row.task}-${row.sparsity}`">
-              <td>{{ row.model }}</td>
-              <td>{{ row.task }}</td>
-              <td>{{ row.grid }}</td>
-              <td>{{ row.topk }}</td>
-              <td>{{ row.sparsity }}</td>
-              <td class="bench-latency">{{ row.latency }} s</td>
-              <td class="bench-breakdown">{{ row.breakdown }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="impact-strip bench-strip" aria-label="Key benchmark observations">
-        <div v-for="stat in benchStats" :key="stat.label">
-          <strong>{{ stat.value }}</strong>
-          <span>{{ stat.label }}</span>
+      <!-- Latency & speedup (paper Figures 2 + 3) -->
+      <figure class="figure-card">
+        <div class="figure-head">
+          <h3>End-to-end latency &amp; speedup</h3>
+          <span class="figure-tag">Figures 2–3</span>
         </div>
-      </div>
 
-<!--      <p class="bench-foot">-->
-<!--        All runs warmed up (BENCHMARK=1) so torch.compile overhead is excluded; seven tasks run-->
-<!--        serially on an otherwise idle GPU.-->
-<!--      </p>-->
+        <div class="figure-strip" aria-label="Headline speedup numbers">
+          <div><strong>265×</strong><span>max measured speedup · Wan2.1-T2V-14B-720P @ 97% · RTX 5090</span></div>
+          <div><strong>220×</strong><span>Wan2.1-T2V-14B-720P @ 97% · H100</span></div>
+          <div><strong>200×</strong><span>Wan2.2-T2V-720P @ 97% sparsity</span></div>
+        </div>
+
+        <div class="chart-duo chart-duo-stack">
+          <div class="chart-slot">
+            <p class="chart-slot-label">(a) Latency per video · log scale</p>
+            <EChart :option="latencyOpt" height="330px" />
+          </div>
+          <div class="chart-slot">
+            <p class="chart-slot-label">(b) Speedup over Full Attention</p>
+            <EChart :option="speedupOpt" height="330px" />
+          </div>
+          <div class="chart-slot chart-slot-wide">
+            <p class="chart-slot-label">
+              Headline — Wan2.1-T2V-14B-720P @ 97% sparsity · RTX 5090 · 81 frames (5.06 s clip)
+            </p>
+            <EChart :option="headlineOpt" height="190px" />
+          </div>
+        </div>
+
+        <figcaption class="figure-note">
+          Suffixes 90 / 97 denote attention sparsity. Speedup = Full Attention latency ÷
+          SparkDiffusion latency, rounded to the nearest integer. Wan2.2 RTX 5090 latency includes
+          high-noise / low-noise expert switching overhead; on H100 both experts stay resident, so
+          no switching cost is incurred.
+        </figcaption>
+      </figure>
+
+      <!-- High-sparsity trap (paper Figure 4) -->
+      <figure class="figure-card">
+        <div class="figure-head">
+          <h3>The high-sparsity trap</h3>
+          <span class="figure-tag">Figure 4</span>
+        </div>
+        <EChart :option="trapOpt" height="340px" />
+        <figcaption class="figure-note">
+          Oracle correction on Wan2.1-T2V-14B: replacing the sparse student's velocity with the
+          dense teacher's on a matched noise window. High-noise correction recovers most of the
+          terminal gap; low-noise correction yields limited gain — the dominant failure is injected
+          during high-noise structure generation and accumulated by later steps.
+        </figcaption>
+      </figure>
+
+      <!-- Quality (paper Table 1) -->
+      <figure class="figure-card">
+        <div class="figure-head">
+          <h3>Generation quality — VBench &amp; VBench-2.0</h3>
+          <span class="figure-tag">Table 1</span>
+        </div>
+
+        <div class="chart-duo">
+          <div class="chart-slot">
+            <p class="chart-slot-label">VBench Total (zoomed 80–85)</p>
+            <EChart :option="vbenchOpt" height="300px" />
+          </div>
+          <div class="chart-slot">
+            <p class="chart-slot-label">VBench-2.0 capabilities · Wan2.1-T2V-14B</p>
+            <EChart :option="radarOpt" height="300px" />
+          </div>
+        </div>
+
+        <div class="bench-table-wrap quality-wrap">
+          <table class="bench-table quality-table">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Method</th>
+                <th>VBench ↑</th>
+                <th>VB2 Total ↑</th>
+                <th>Creat. ↑</th>
+                <th>Common. ↑</th>
+                <th>Control. ↑</th>
+                <th>Human Fid. ↑</th>
+                <th>Physics ↑</th>
+                <th>Sparsity</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-for="model in qualityModels" :key="model">
+                <tr
+                  v-for="(row, i) in qualityRows.filter((r) => r.model === model)"
+                  :key="model + row.method"
+                  :class="{ 'is-ours': row.method === 'SparkDiffusion', 'is-first': i === 0 }"
+                >
+                  <td v-if="i === 0" :rowspan="qualityRows.filter((r) => r.model === model).length">{{ model }}</td>
+                  <td>{{ row.method }}</td>
+                  <td class="qnum qnum-strong">{{ row.vbench.toFixed(2) }}</td>
+                  <td class="qnum">{{ row.vb2.toFixed(2) }}</td>
+                  <td class="qnum">{{ row.creativity.toFixed(2) }}</td>
+                  <td class="qnum">{{ row.commonsense.toFixed(2) }}</td>
+                  <td class="qnum">{{ row.controllability.toFixed(2) }}</td>
+                  <td class="qnum">{{ row.humanFidelity.toFixed(2) }}</td>
+                  <td class="qnum">{{ row.physics.toFixed(2) }}</td>
+                  <td class="qnum">{{ row.sparsity }}</td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+
+        <figcaption class="figure-note">
+          Wan2.1-T2V-1.3B evaluated at 480 × 832; Wan2.1-T2V-14B and Wan2.2-T2V-A14B at
+          720 × 1280, all with 81-frame generation. Higher is better. At up to 97% sparsity,
+          SparkDiffusion stays within ~0.9 VBench points of the dense baseline while running
+          orders of magnitude faster, and exceeds both baselines on VBench-2.0 Human Fidelity.
+        </figcaption>
+      </figure>
     </section>
 
     <section id="demos" class="demos-section page-width">
@@ -454,12 +541,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               {{ citationCopied ? 'Copied' : 'Copy citation' }}
             </button>
           </div>
-          <pre><code>@article{liu2026ropeslr,
-  title   =   {RoPeSLR: 3D RoPE-driven Sparse-LowRank Attention for Efficient Diffusion Transformers},
-  author  =   {Liu, Yuxi and Zhang, Zekun and Cai, Yixiang and Deng, Renjia and He, Yutong and Yuan, Kun},
-  journal =   {arXiv preprint arXiv:2605.20659},
-  year    =   {2026}
-}</code></pre>
+          <pre><code>{{ citation }}</code></pre>
           <div class="citation-card-foot"><span>PLEASE CITE THIS WORK</span><span>↗</span></div>
         </div>
       </div>

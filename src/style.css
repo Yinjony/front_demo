@@ -392,6 +392,19 @@ h2 {
   line-height: 1.55;
 }
 
+.affiliation sup {
+  margin-right: .1rem;
+  color: var(--signal);
+  font-size: .58rem;
+}
+
+.affiliation-note {
+  margin: .45rem 0 0;
+  color: var(--quiet);
+  font: .64rem/1.5 'DM Mono', monospace;
+  letter-spacing: .04em;
+}
+
 /* ===== Buttons ============================================================ */
 .expand-button {
   display: inline-grid;
@@ -431,7 +444,7 @@ h2 {
   height: 1rem;
 }
 
-/* "let's go RoPeSLR" — pill CTA that inherits the scroll-cue's bottom-left
+/* "let's go SparkDiffusion" — pill CTA that inherits the scroll-cue's bottom-left
    post and its signature traveling-line motif, but now reads as a button:
    glass pill, acid-green hover (same vocabulary as .nav-action / .copy-button). */
 .scroll-cue {
@@ -447,8 +460,8 @@ h2 {
   color: var(--ink);
   background: rgba(8, 12, 26, .4);
   backdrop-filter: blur(8px);
-  /* Mixed-case on purpose — keeps the "RoPeSLR" wordmark casing intact
-     instead of uppercasing it to ROPESLR. */
+  /* Mixed-case on purpose — keeps the "SparkDiffusion" wordmark casing intact
+     instead of uppercasing it to SPARKDIFFUSION. */
   font: .72rem/1 'DM Mono', monospace;
   letter-spacing: .1em;
   transition: border .2s, background .2s, color .2s, transform .2s;
@@ -1402,5 +1415,182 @@ h2 {
     animation-iteration-count: 1 !important;
     transition-duration: .001ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ===== Method / figure cards ============================================= */
+.method-section {
+  padding-top: clamp(3rem, 8vw, 7rem);
+  padding-bottom: clamp(3rem, 8vw, 7rem);
+  border-top: 1px solid var(--rule);
+}
+
+.method-section .demos-heading > p {
+  max-width: 620px;
+}
+
+/* One paper figure per card — the CAD substrate + rule border matches
+   .bench-table-wrap / .demo-frame so charts read as part of the page. */
+.figure-card {
+  margin: clamp(2.5rem, 5vw, 4rem) 0 0;
+  padding: clamp(1.1rem, 2.4vw, 1.8rem);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: rgba(13, 19, 34, .78);
+}
+
+.method-figure {
+  margin-top: clamp(2.5rem, 5vw, 4rem);
+}
+
+.figure-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+
+.figure-head h3 {
+  margin: 0;
+  color: var(--ink);
+  letter-spacing: .04em;
+  font: 500 clamp(.95rem, 1.4vw, 1.15rem)/1.2 'DM Mono', monospace;
+  text-transform: uppercase;
+}
+
+.figure-tag {
+  flex: none;
+  padding: .3rem .55rem;
+  border: 1px solid rgba(77, 139, 255, .4);
+  border-radius: 99px;
+  color: var(--signal);
+  font: 500 .58rem/1 'DM Mono', monospace;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.figure-note {
+  margin: 1.1rem 0 0;
+  color: var(--quiet);
+  font-size: .74rem;
+  line-height: 1.65;
+}
+
+/* Headline stat strip inside a figure card — impact-strip vocabulary. */
+.figure-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 1.2rem;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.figure-strip > div {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 6.4rem;
+  padding: .9rem 1rem;
+  border-right: 1px solid var(--rule);
+}
+
+.figure-strip > div:first-child {
+  border-left: 1px solid var(--rule);
+}
+
+.figure-strip strong {
+  color: var(--signal);
+  letter-spacing: -.05em;
+  font-size: clamp(1.5rem, 2.6vw, 2.3rem);
+  font-weight: 500;
+  line-height: 1;
+  text-shadow: 0 0 24px rgba(77, 139, 255, .35);
+}
+
+.figure-strip span {
+  max-width: 15rem;
+  margin-top: .45rem;
+  color: var(--muted);
+  font-size: .66rem;
+  line-height: 1.45;
+}
+
+/* Chart layouts — two-up by default, one-up under 900px. */
+.chart-duo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1rem, 2.4vw, 1.8rem);
+}
+
+.chart-duo-stack {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.chart-slot {
+  min-width: 0;
+}
+
+.chart-slot-wide {
+  grid-column: 1 / -1;
+}
+
+.chart-slot-label {
+  margin: 0 0 .55rem;
+  color: var(--quiet);
+  font: 500 .62rem/1.4 'DM Mono', monospace;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+/* ===== Quality table (Table 1) ============================================ */
+.quality-wrap {
+  margin-top: 1.3rem;
+}
+
+.quality-table td {
+  white-space: nowrap;
+}
+
+.quality-table .qnum {
+  font-family: 'DM Mono', monospace;
+  font-size: .78rem;
+}
+
+.quality-table .qnum-strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.quality-table tr.is-ours td {
+  background: rgba(77, 139, 255, .07);
+}
+
+.quality-table tr.is-ours td:first-child {
+  border-left: 2px solid var(--signal);
+}
+
+.quality-table tr.is-first td {
+  border-top: 1px solid var(--rule);
+}
+
+@media (max-width: 900px) {
+  .chart-duo,
+  .chart-duo-stack {
+    grid-template-columns: 1fr;
+  }
+
+  .figure-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .figure-strip > div {
+    border-left: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .figure-strip > div:last-child {
+    border-bottom: 0;
   }
 }
