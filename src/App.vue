@@ -288,9 +288,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           delivering large measured speedups.
         </p>
         <div class="impact-strip" aria-label="Key results from the paper">
-          <div><strong>200×</strong><span>end-to-end speedup on Wan2.2-T2V-720P at 97% attention sparsity</span></div>
-          <div><strong>1.6 s</strong><span>per Wan2.1-T2V-1.3B-480P video on a single RTX 5090</span></div>
-          <div><strong>97%</strong><span>attention sparsity with dense-comparable generation quality</span></div>
+          <div><strong>2 0 0 ×</strong><span>end-to-end speedup on Wan2.2-T2V-720P at 97% attention sparsity</span></div>
+          <div><strong>1 . 6 s</strong><span>per Wan2.1-T2V-1.3B-480P video on a single RTX 5090</span></div>
+          <div><strong>9 7 %</strong><span>attention sparsity with dense-comparable generation quality</span></div>
         </div>
       </div>
     </section>
@@ -300,13 +300,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         <div>
           <h2>Method</h2>
         </div>
-        <p>
-          Three post-training stages plus a deployment step convert one pretrained dense video DiT
-          into a high-sparsity, few-step generator — without retraining from scratch. Stage 1
-          warms up the compensated sparse architecture into a coarse prior; stage 2 distills the
-          trajectory with high-noise structural alignment and low-noise distribution matching;
-          stage 3 quantizes to fused FP8 kernels for real wall-clock gains.
-        </p>
       </div>
 
       <figure class="figure-card method-figure">
@@ -328,11 +321,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         <div>
           <h2>Results</h2>
         </div>
-        <p>
-          End-to-end latency, speedup, and generation quality across Wan models, resolutions, and
-          sparsity levels up to 97% — measured on NVIDIA H100 and RTX 5090 GPUs. All charts are
-          interactive re-drawings of the paper's figures from the reported numbers.
-        </p>
       </div>
 
       <!-- Latency & speedup (paper Figures 2 + 3) -->
