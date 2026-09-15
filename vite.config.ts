@@ -9,6 +9,6 @@ export default defineConfig({
     // 用 true 省得反复改）。只对 dev server 生效，不影响生产构建。
     allowedHosts: true,
   },
-  base:'front_demo',
+  base:'/front_demo/',
   
 })
