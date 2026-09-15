@@ -34,12 +34,6 @@ const radarOpt = radarOption()
 
 const qualityModels = [...new Set(qualityRows.map((r) => r.model))]
 
-/* ===== Demo gallery: per-model blocks × per-prompt rows × per-method columns ==
-   Source tree convention: docs/videos/<model>/<method>/<file>.mp4 — one glob
-   picks up everything, then rows group by filename-stem so the same prompt's
-   three methods land side by side. Models render in the fixed order below;
-   a model with no files drops out of the gallery automatically.            */
-
 const methodOrder = ['full_attention', 'turbo_diffusion', 'ours'] as const
 const methodLabels: Record<string, string> = {
   full_attention: 'Full Attention',
