@@ -1,4 +1,5 @@
 <script setup lang="ts">
+
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import EChart from './components/EChart.vue'
 import FrameworkDiagram from './components/FrameworkDiagram.vue'
