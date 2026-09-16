@@ -79,41 +79,33 @@ type MethodCell = { method: (typeof methodOrder)[number]; label: string; source:
 type GalleryRow = { key: string; prompt: string; cells: MethodCell[] }
 type ModelBlock = { model: string; rows: GalleryRow[] }
 
-// Row grouping key — methods name the same prompt differently (e.g. Ours
-// "06_seed42.mp4" vs Turbo Diffusion "prompt_06.mp4"), so rows group by the
-// first digit-run in the filename instead of the raw stem: both normalize
-// to "06" and land on the same row.
-const rowKeyOf = (file: string) => file.match(/\d+/)?.[0] ?? file
-
+// Rows pair the same prompt across methods, but each method names its file
+// differently ("0001_….mp4" vs "prompt_02.mp4" vs "sample_1.mp4") and the
+// numbers don't even agree — Turbo Diffusion's prompt IDs are offset from
+// Full Attention / Ours. What DOES hold: every method folder holds one video
+// per prompt, in prompt order, and glob keys are sorted, so rows group by
+// position in each method's file list: position N ↔ prompt N.
 const modelBlocks: ModelBlock[] = modelOrder
   .map((model) => {
-    // Buckets: row key → method → resolved URL. Glob keys are sorted, so files
-    // that share a row stay in file order within a method.
-    const buckets = new Map<string, Map<string, string[]>>()
+    // Method → resolved URLs, in sorted file order.
+    const byMethod = new Map<string, string[]>()
     for (const [path, source] of Object.entries(allVideos)) {
-      const [m, method, file] = path.split('/').slice(-3)
+      const [m, method] = path.split('/').slice(-3)
       if (m !== model) continue
-      const rowKey = rowKeyOf(file)
-      let byMethod = buckets.get(rowKey)
-      if (!byMethod) buckets.set(rowKey, (byMethod = new Map()))
-      const list = byMethod.get(method) ?? []
-      list.push(source)
-      byMethod.set(method, list)
+      byMethod.set(method, [...(byMethod.get(method) ?? []), source])
     }
 
-    // Numeric row order — "2" must come before "10".
-    const rows: GalleryRow[] = [...buckets.entries()]
-      .sort(([a], [b]) => Number(a) - Number(b))
-      .map(([rowKey, byMethod], index) => ({
-        key: `${model}-${rowKey}`,
-        prompt: rowPrompt(model, index),
-        cells: methodOrder
-          .map((method): MethodCell | null => {
-            const source = byMethod.get(method)?.[0]
-            return source ? { method, label: methodLabels[method], source } : null
-          })
-          .filter((cell): cell is MethodCell => cell !== null),
-      }))
+    const rowCount = Math.max(0, ...[...byMethod.values()].map((list) => list.length))
+    const rows: GalleryRow[] = Array.from({ length: rowCount }, (_, index) => ({
+      key: `${model}-${index}`,
+      prompt: rowPrompt(model, index),
+      cells: methodOrder
+        .map((method): MethodCell | null => {
+          const source = byMethod.get(method)?.[index]
+          return source ? { method, label: methodLabels[method], source } : null
+        })
+        .filter((cell): cell is MethodCell => cell !== null),
+    }))
 
     return { model, rows }
   })
