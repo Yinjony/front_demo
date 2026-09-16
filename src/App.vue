@@ -20,7 +20,6 @@ type Demo = {
 }
 
 const menuOpen = ref(false)
-const openPromptId = ref<string | null>(null)
 const expandedVideo = ref<Demo | null>(null)
 const citationCopied = ref(false)
 
@@ -34,20 +33,68 @@ const radarOpt = radarOption()
 
 const qualityModels = [...new Set(qualityRows.map((r) => r.model))]
 
-const methodOrder = ['full_attention', 'turbo_diffusion', 'ours'] as const
-const methodLabels: Record<string, string> = {
-  full_attention: 'Full Attention',
-  turbo_diffusion: 'Turbo Diffusion',
-  ours: 'Ours',
-}
+type DemoMethodSpec = { folder: string; label: string; note?: string; ours?: boolean }
+type DemoModelSpec = { folder: string; title: string; methods: DemoMethodSpec[] }
 
-const modelOrder = [
-  'Wan2.1-T2V-1.3B-480P-90',
-  'Wan2.1-T2V-14B-480P-90',
-  'Wan2.1-T2V-14B-720P-95',
-  'Wan2.1-I2V-14B-720P-95',
-  'Wan2.2-T2V-A14B-480P-95',
-  'Wan2.2-T2V-A14B-720P-97',
+// One card per model (NVIDIA Sol-Engine style): title + method strip → one
+// prompt → one row of method videos. `folder` is the directory under
+// docs/videos-real; each method takes the FIRST file (glob keys are sorted)
+// from videos-real/<folder>/<method>/, and the prompt is the FIRST line of
+// videos-real/<folder>/prompts.txt.
+const demoSpecs: DemoModelSpec[] = [
+  {
+    title: 'Wan2.1-T2V-1.3B · 480P',
+    folder: 'Wan2.1-T2V-1.3B-480P-90',
+    methods: [
+      { folder: 'full_attention', label: 'Full Attention' },
+      { folder: 'turbo_diffusion', label: 'Turbo Diffusion', note: '90% sparsity' },
+      { folder: 'ours', label: 'Ours', note: '90% sparsity', ours: true },
+    ],
+  },
+  {
+    title: 'Wan2.1-T2V-14B · 480P',
+    folder: 'Wan2.1-T2V-14B-480P-90',
+    methods: [
+      { folder: 'full_attention', label: 'Full Attention' },
+      { folder: 'turbo_diffusion', label: 'Turbo Diffusion', note: '90% sparsity' },
+      { folder: 'ours', label: 'Ours', note: '90% sparsity', ours: true },
+    ],
+  },
+  {
+    title: 'Wan2.1-T2V-14B · 720P',
+    folder: 'Wan2.1-T2V-14B-720P-95',
+    methods: [
+      { folder: 'full_attention', label: 'Full Attention' },
+      { folder: 'turbo_diffusion', label: 'Turbo Diffusion', note: '90% sparsity' },
+      { folder: 'ours', label: 'Ours', note: '97% sparsity', ours: true },
+    ],
+  },
+  {
+    title: 'Wan2.1-I2V-14B · 720P',
+    folder: 'Wan2.1-I2V-14B-720P-95',
+    methods: [
+      { folder: 'full_attention', label: 'Full Attention' },
+      { folder: 'ours', label: 'Ours', note: '97% sparsity', ours: true },
+    ],
+  },
+  {
+    title: 'Wan2.1-T2V-14B · 720P · 3 steps',
+    folder: 'Wan2.1-T2V-14B-720P-3steps',
+    methods: [
+      { folder: 'full_attention', label: 'Full Attention', note: '3 steps' },
+      { folder: 'turbo_diffusion', label: 'Turbo Diffusion', note: '90% · 3 steps' },
+      { folder: 'fastwan', label: 'FastWan', note: '90% · 3 steps' },
+      { folder: 'ours', label: 'Ours', note: '95% · 3 steps', ours: true },
+    ],
+  },
+  {
+    title: 'Wan2.2-T2V-A14B · 720P',
+    folder: 'Wan2.2-T2V-A14B-720P-97',
+    methods: [
+      { folder: 'full_attention', label: 'Full Attention' },
+      { folder: 'ours', label: 'Ours', note: '97% sparsity', ours: true },
+    ],
+  },
 ]
 
 const allVideos = import.meta.glob('../docs/videos-real/*/*/*.mp4', {
@@ -71,51 +118,50 @@ const modelPrompts = (model: string) => {
   return raw.split(/\r?\n/).filter((line) => line.trim() !== '')
 }
 
-const rowPrompt = (model: string, row: number) =>
-  modelPrompts(model)[row]?.trim() ||
-  `[ Add the original input prompt for ${model} row ${row + 1} ]`
+// First (sorted) video of videos-real/<model>/<method>/ — glob keys are
+// sorted paths, so find() yields the alphabetically first file.
+const firstVideoOf = (model: string, method: string) =>
+  Object.entries(allVideos).find(([p]) => p.includes(`/${model}/${method}/`))?.[1]
 
-type MethodCell = { method: (typeof methodOrder)[number]; label: string; source: string }
-type GalleryRow = { key: string; prompt: string; cells: MethodCell[] }
-type ModelBlock = { model: string; rows: GalleryRow[] }
+// First prompt line of videos-real/<model>/prompts.txt.
+const modelPrompt = (model: string) =>
+  modelPrompts(model)[0] || `[ Add the original input prompt for ${model} ]`
 
-// Rows pair the same prompt across methods, but each method names its file
-// differently ("0001_….mp4" vs "prompt_02.mp4" vs "sample_1.mp4") and the
-// numbers don't even agree — Turbo Diffusion's prompt IDs are offset from
-// Full Attention / Ours. What DOES hold: every method folder holds one video
-// per prompt, in prompt order, and glob keys are sorted, so rows group by
-// position in each method's file list: position N ↔ prompt N.
-const modelBlocks: ModelBlock[] = modelOrder
-  .map((model) => {
-    // Method → resolved URLs, in sorted file order.
-    const byMethod = new Map<string, string[]>()
-    for (const [path, source] of Object.entries(allVideos)) {
-      const [m, method] = path.split('/').slice(-3)
-      if (m !== model) continue
-      byMethod.set(method, [...(byMethod.get(method) ?? []), source])
-    }
+type DemoCell = { method: string; label: string; note?: string; ours: boolean; source: string }
+type DemoBlock = { folder: string; title: string; prompt: string; cells: DemoCell[] }
 
-    const rowCount = Math.max(0, ...[...byMethod.values()].map((list) => list.length))
-    const rows: GalleryRow[] = Array.from({ length: rowCount }, (_, index) => ({
-      key: `${model}-${index}`,
-      prompt: rowPrompt(model, index),
-      cells: methodOrder
-        .map((method): MethodCell | null => {
-          const source = byMethod.get(method)?.[index]
-          return source ? { method, label: methodLabels[method], source } : null
+const demoBlocks: DemoBlock[] = demoSpecs
+  .map((spec) => {
+    const cells: DemoCell[] = []
+    const missing: string[] = []
+    for (const method of spec.methods) {
+      const source = firstVideoOf(spec.folder, method.folder)
+      if (source) {
+        cells.push({
+          method: method.folder,
+          label: method.label,
+          note: method.note,
+          ours: method.ours ?? false,
+          source,
         })
-        .filter((cell): cell is MethodCell => cell !== null),
-    }))
-
-    return { model, rows }
+      } else {
+        missing.push(method.folder)
+      }
+    }
+    // Videos land in docs/videos-real progressively — surface gaps in the
+    // console so a silently half-empty card is easy to spot in dev.
+    if (missing.length) {
+      console.warn(`[demos] ${spec.folder}: no videos found for ${missing.join(', ')}`)
+    }
+    return { folder: spec.folder, title: spec.title, prompt: modelPrompt(spec.folder), cells }
   })
-  .filter((block) => block.rows.length > 0)
+  .filter((block) => block.cells.length > 0)
 
 const heroDemo = (() => {
-  for (const model of modelOrder) {
-    for (const method of methodOrder) {
-      const hit = Object.entries(allVideos).find(([p]) => p.includes(`/${model}/${method}/`))
-      if (hit) return { label: `${model} / ${methodLabels[method]}`, source: hit[1] }
+  for (const spec of demoSpecs) {
+    for (const method of spec.methods) {
+      const source = firstVideoOf(spec.folder, method.folder)
+      if (source) return { label: `${spec.folder} / ${method.label}`, source }
     }
   }
   return null
@@ -129,10 +175,6 @@ function openVideo(demo: Demo | null) {
 
 function closeVideo() {
   expandedVideo.value = null
-}
-
-function togglePrompt(id: string) {
-  openPromptId.value = openPromptId.value === id ? null : id
 }
 
 // Mirrors the in-page anchor links — relies on html { scroll-behavior: smooth }
@@ -442,62 +484,41 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </div>
 
       <div
-        v-for="block in modelBlocks"
-        :key="block.model"
+        v-for="block in demoBlocks"
+        :key="block.folder"
         class="model-block"
-        :data-model="block.model"
+        :data-model="block.folder"
       >
-        <h3 class="model-title">{{ block.model }}</h3>
+        <div class="model-head">
+          <h3 class="model-title">{{ block.title }}</h3>
+          <span class="model-methods">{{ block.cells.map((cell) => cell.label).join(' · ') }}</span>
+        </div>
 
-        <div class="model-grid">
-          <!-- Method column headers — same 3-col grid as .demo-row-videos so
-               each label sits exactly over its column of videos. -->
-          <div class="method-header" aria-hidden="true">
-            <span
-              v-for="method in methodOrder"
-              :key="method"
-              :class="{ 'is-ours': method === 'ours' }"
-            >{{ methodLabels[method] }}</span>
-          </div>
-          <div
-            v-for="row in block.rows"
-            :key="row.key"
-            class="demo-row"
-          >
-            <div class="demo-row-videos">
-              <figure v-for="cell in row.cells" :key="row.key + cell.method" class="video-card">
-                <div
-                  class="demo-frame"
-                  :class="{ 'is-prompt-open': openPromptId === row.key + cell.method }"
-                  @mouseleave="openPromptId = null"
-                >
-                  <video :src="cell.source" autoplay muted loop playsinline preload="metadata"></video>
-                  <div class="prompt-overlay" aria-hidden="true">
-                    <span>Prompt</span>
-                    <p>{{ row.prompt }}</p>
-                  </div>
-                  <button
-                    type="button"
-                    class="prompt-button"
-                    :aria-pressed="openPromptId === row.key + cell.method"
-                    :aria-label="openPromptId === row.key + cell.method ? 'Hide prompt' : 'Show prompt'"
-                    @click.stop="togglePrompt(row.key + cell.method)"
-                  >Prompt</button>
-                  <button
-                    type="button"
-                    class="expand-button"
-                    :aria-label="`Expand ${cell.label} video — ${row.prompt}`"
-                    :title="cell.label"
-                    @click.stop="openVideo({ id: row.key + cell.method, label: `${block.model} · ${cell.label}`, source: cell.source, prompt: row.prompt })"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
-                      <path d="M15 3h6v6M21 3l-7 7M9 21H3v-6M3 21l7-7" />
-                    </svg>
-                  </button>
-                </div>
-              </figure>
+        <p class="model-prompt">{{ block.prompt }}</p>
+
+        <!-- Column count follows the method count (2–4) via --cols; the media
+             queries below still collapse it to 2 / 1 columns on small screens. -->
+        <div class="demo-row-videos" :style="{ '--cols': block.cells.length }">
+          <figure v-for="cell in block.cells" :key="block.folder + cell.method" class="video-card">
+            <div class="demo-frame">
+              <video :src="cell.source" autoplay muted loop playsinline preload="metadata"></video>
+              <button
+                type="button"
+                class="expand-button"
+                :aria-label="`Expand ${cell.label} video — ${block.prompt}`"
+                :title="cell.label"
+                @click.stop="openVideo({ id: block.folder + cell.method, label: `${block.title} · ${cell.label}`, source: cell.source, prompt: block.prompt })"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
+                  <path d="M15 3h6v6M21 3l-7 7M9 21H3v-6M3 21l7-7" />
+                </svg>
+              </button>
             </div>
-          </div>
+            <figcaption class="vid-meta" :class="{ 'is-ours': cell.ours }">
+              <span class="t">{{ cell.label }}</span>
+              <span v-if="cell.note" class="r">{{ cell.note }}</span>
+            </figcaption>
+          </figure>
         </div>
       </div>
     </section>
