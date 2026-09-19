@@ -90,7 +90,7 @@
 
   /* Fluid hero title size — change this ONE value to rescale the headline.
      Override it on any element or inside a media query (see the 570px one). */
-  --title-size: clamp(2.4rem, 5.2vw, 4.6rem);
+  --title-size: clamp(2rem, 3.9vw, 3.2rem);
 
   color: var(--ink);
   background: var(--black);
@@ -1024,6 +1024,17 @@ h2 {
   color: rgba(255, 255, 255, .86);
   /* Code block — monospace, bumped from .78rem so the aligned bibtex reads clearly. */
   font: .9rem/1.8 'DM Mono', monospace;
+}
+
+/* Related-work card — five entries run long, so cap the height and let it
+   scroll instead of stretching the page. */
+.citation-card + .citation-card {
+  margin-top: clamp(1rem, 2vw, 1.6rem);
+}
+
+.citation-card-related pre {
+  max-height: 24rem;
+  overflow-y: auto;
 }
 
 .citation-card-foot {

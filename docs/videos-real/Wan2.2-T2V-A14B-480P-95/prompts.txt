@@ -1,7 +1,0 @@
-[ Add the original input prompt for Wan2.2-T2V-A14B-480P-95 row 1 ]
-
-[ Add the original input prompt for Wan2.2-T2V-A14B-480P-95 row 2 ]
-
-[ Add the original input prompt for Wan2.2-T2V-A14B-480P-95 row 3 ]
-
-[ Add the original input prompt for Wan2.2-T2V-A14B-480P-95 row 4 ]

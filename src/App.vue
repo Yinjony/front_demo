@@ -22,7 +22,7 @@ type Demo = {
 
 const menuOpen = ref(false)
 const expandedVideo = ref<Demo | null>(null)
-const citationCopied = ref(false)
+const copiedKey = ref<string | null>(null)
 
 /* Static option objects — charts don't react to anything, so build once. */
 const latencyOpt = latencyOption()
@@ -75,14 +75,15 @@ const demoSpecs: DemoModelSpec[] = [
     folder: 'Wan2.1-I2V-14B-720P-95',
     methods: [
       { folder: 'full_attention', label: 'Full Attention' },
-      { folder: 'ours', label: 'Ours', note: '97% sparsity', ours: true },
+      { folder: 'ours_top0.05', label: 'Ours (top 5%)', note: '95% sparsity', ours: true },
+      { folder: 'ours_top0.1', label: 'Ours (top 10%)', note: '90% sparsity', ours: true },
     ],
   },
   {
-    title: 'Wan2.1-T2V-14B · 720P · 3 steps',
-    folder: 'Wan2.1-T2V-14B-720P-3steps',
+    title: 'Wan2.1-T2V-14B · 720P · 3 Steps',
+    folder: 'Wan2.1-T2V-720p-3steps',
     methods: [
-      { folder: 'full_attention', label: 'Full Attention', note: '3 steps' },
+      { folder: 'full_attention', label: 'Full Attention' },
       { folder: 'turbo_diffusion', label: 'Turbo Diffusion', note: '90% · 3 steps' },
       { folder: 'fastwan', label: 'FastWan', note: '90% · 3 steps' },
       { folder: 'ours', label: 'Ours', note: '95% · 3 steps', ours: true },
@@ -192,11 +193,50 @@ const citation = `@article{liu2026sparkdiffusion,
   url     = {https://SparkDiffusion.com}
 }`
 
-async function copyCitation() {
+// Baselines and kernels the demos compare against — same BibTeX style as
+// the primary entry.
+const relatedWork = `@article{zhang2025turbodiffusion,
+  title={TurboDiffusion: Accelerating Video Diffusion Models by 100-200 Times},
+  author={Zhang, Jintao and Zheng, Kaiwen and Jiang, Kai and Wang, Haoxu and Stoica, Ion and Gonzalez, Joseph E and Chen, Jianfei and Zhu, Jun},
+  journal={arXiv preprint arXiv:2512.16093},
+  year={2025}
+}
+
+@inproceedings{zhang2025sageattention,
+  title={SageAttention: Accurate 8-Bit Attention for Plug-and-play Inference Acceleration},
+  author={Zhang, Jintao and Wei, Jia and Zhang, Pengle and Zhu, Jun and Chen, Jianfei},
+  booktitle={International Conference on Learning Representations (ICLR)},
+  year={2025}
+}
+
+@article{zhang2025sla,
+  title={SLA: Beyond Sparsity in Diffusion Transformers via Fine-Tunable Sparse-Linear Attention},
+  author={Zhang, Jintao and Wang, Haoxu and Jiang, Kai and Yang, Shuo and Zheng, Kaiwen and Xi, Haocheng and Wang, Ziteng and Zhu, Hongzhou and Zhao, Min and Stoica, Ion and others},
+  journal={arXiv preprint arXiv:2509.24006},
+  year={2025}
+}
+
+@article{zheng2025rcm,
+  title={Large Scale Diffusion Distillation via Score-Regularized Continuous-Time Consistency},
+  author={Zheng, Kaiwen and Wang, Yuji and Ma, Qianli and Chen, Huayu and Zhang, Jintao and Balaji, Yogesh and Chen, Jianfei and Liu, Ming-Yu and Zhu, Jun and Zhang, Qinsheng},
+  journal={arXiv preprint arXiv:2510.08431},
+  year={2025}
+}
+
+@inproceedings{zhang2024sageattention2,
+  title={Sageattention2: Efficient attention with thorough outlier smoothing and per-thread int4 quantization},
+  author={Zhang, Jintao and Huang, Haofeng and Zhang, Pengle and Wei, Jia and Zhu, Jun and Chen, Jianfei},
+  booktitle={International Conference on Machine Learning (ICML)},
+  year={2025}
+}`
+
+async function copyBibtex(key: string, text: string) {
   try {
-    await navigator.clipboard.writeText(citation)
-    citationCopied.value = true
-    window.setTimeout(() => (citationCopied.value = false), 1800)
+    await navigator.clipboard.writeText(text)
+    copiedKey.value = key
+    window.setTimeout(() => {
+      if (copiedKey.value === key) copiedKey.value = null
+    }, 1800)
   } catch {
     // Clipboard access may be disabled on some preview deployments.
   }
@@ -254,7 +294,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             </svg>
             <span>Paper</span>
           </a>
-          <a class="nav-action" href="https://github.com/your-org/your-project" target="_blank" rel="noreferrer" @click="menuOpen = false">
+          <a class="nav-action" href="https://github.com/AlibabaResearch/SparkDiffusion" target="_blank" rel="noreferrer" @click="menuOpen = false">
             <svg class="nav-icon github-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M12 2.2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.86c-2.78.61-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.54 1.04 1.54 1.04.9 1.55 2.35 1.1 2.93.84.09-.66.35-1.1.64-1.36-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.55 9.55 0 0 1 12 6.52c.85 0 1.7.12 2.5.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.35 4.69-4.58 4.94.36.31.68.9.68 1.81v2.8c0 .27.18.58.69.48A10 10 0 0 0 12 2.2Z" />
             </svg>
@@ -264,8 +304,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </nav>
 
       <div class="hero-copy page-width">
-        <p class="kicker">SparkDiffusion · 2026</p>
-        <h1>SparkDiffusion:<br /><span>Mitigating the High-Sparsity Trap — A Unified Framework for 200× Single-GPU Acceleration of Visual Generation</span></h1>
+        <p class="kicker">ICLR · 2027</p>
+        <h1>SparkDiffusion:<br /><span>Mitigating the High-Sparsity Trap — A Unified Framework for 265× Single-GPU Acceleration of Visual Generation</span></h1>
         <p class="hero-lede">
           A unified post-training framework — compensated sparse attention, trajectory-mixed
           distillation, and fused FP8 deployment — that turns dense video DiTs into high-sparsity,
@@ -532,13 +572,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         <div class="citation-card">
           <div class="citation-card-top">
             <div><span>BIBTEX / 2026</span></div>
-            <button type="button" class="copy-button" @click="copyCitation">
+            <button type="button" class="copy-button" @click="copyBibtex('ours', citation)">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="11" height="12" rx="1.5" /><path d="M5 16V5.5A1.5 1.5 0 0 1 6.5 4H16" /></svg>
-              {{ citationCopied ? 'Copied' : 'Copy citation' }}
+              {{ copiedKey === 'ours' ? 'Copied' : 'Copy citation' }}
             </button>
           </div>
           <pre><code>{{ citation }}</code></pre>
           <div class="citation-card-foot"><span>PLEASE CITE THIS WORK</span><span>↗</span></div>
+        </div>
+
+        <div class="citation-card citation-card-related">
+          <div class="citation-card-top">
+            <div><span>RELATED WORK / BIBTEX</span></div>
+            <button type="button" class="copy-button" @click="copyBibtex('related', relatedWork)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="11" height="12" rx="1.5" /><path d="M5 16V5.5A1.5 1.5 0 0 1 6.5 4H16" /></svg>
+              {{ copiedKey === 'related' ? 'Copied' : 'Copy all' }}
+            </button>
+          </div>
+          <pre><code>{{ relatedWork }}</code></pre>
+          <div class="citation-card-foot"><span>BASELINES &amp; KERNELS COMPARED ON THIS PAGE</span><span>↗</span></div>
         </div>
       </div>
     </section>
