@@ -62,15 +62,6 @@ const demoSpecs: DemoModelSpec[] = [
     ],
   },
   {
-    title: 'Wan2.1-T2V-14B · 720P',
-    folder: 'Wan2.1-T2V-14B-720P-95',
-    methods: [
-      { folder: 'full_attention', label: 'Full Attention' },
-      { folder: 'turbo_diffusion', label: 'Turbo Diffusion', note: '90% sparsity' },
-      { folder: 'ours', label: 'Ours', note: '97% sparsity', ours: true },
-    ],
-  },
-  {
     title: 'Wan2.1-I2V-14B · 720P',
     folder: 'Wan2.1-I2V-14B-720P-95',
     methods: [
@@ -193,8 +184,27 @@ const citation = `@article{liu2026sparkdiffusion,
   url     = {https://SparkDiffusion.com}
 }`
 
-// Baselines and kernels the demos compare against — same BibTeX style as
-// the primary entry.
+// Related work from this group — same BibTeX style as the primary entry.
+const relatedWork = `@article{zhang2026rola,
+  title={RoLA: Rotary-Positioned Low-Rank Linear Attention for Efficient Diffusion Transformers},
+  author={Zhang, Zekun and Cai, Yixiang and Liu, Yuxi and Sun, Tengxu and Liu, Tianle and Wu, Zhoutong and Li, Haoyu and Ai, Baole and Wang, Ang and Wang, Jiamang and Qu, Lin and Yuan, Kun},
+  journal={arXiv preprint arXiv:2609.06712},
+  year={2026}
+}
+
+@article{liu2026ropeslr,
+  title={RoPeSLR: 3D RoPE-driven Sparse-LowRank Attention for Efficient Diffusion Transformers},
+  author={Liu, Yuxi and Zhang, Zekun and Cai, Yixiang and Deng, Renjia and He, Yutong and Yuan, Kun},
+  journal={arXiv preprint arXiv:2605.20659},
+  year={2026}
+}
+
+@article{liu2026crossdistill,
+  title={CrossDistill: Balancing Quality and Diversity via Trajectory-Level Hybrid Few-Step Distillation},
+  author={Liu, Yuxi and Li, Haoyu and Cai, Yixiang and Sun, Tengxu and Zhang, Zekun and Ai, Baole and Wang, Ang and Wang, Jiamang and Qu, Lin and Yuan, Kun and Zhang, Kai},
+  journal={arXiv preprint arXiv:2609.14725},
+  year={2026}
+}`
 
 async function copyBibtex(key: string, text: string) {
   try {
@@ -545,6 +555,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           </div>
           <pre><code>{{ citation }}</code></pre>
           <div class="citation-card-foot"><span>PLEASE CITE THIS WORK</span><span>↗</span></div>
+        </div>
+
+        <div class="citation-card citation-card-related">
+          <div class="citation-card-top">
+            <div><span>RELATED WORK / BIBTEX</span></div>
+            <button type="button" class="copy-button" @click="copyBibtex('related', relatedWork)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="11" height="12" rx="1.5" /><path d="M5 16V5.5A1.5 1.5 0 0 1 6.5 4H16" /></svg>
+              {{ copiedKey === 'related' ? 'Copied' : 'Copy all' }}
+            </button>
+          </div>
+          <pre><code>{{ relatedWork }}</code></pre>
+          <div class="citation-card-foot"><span>RELATED WORK FROM THIS EFFORT</span><span>↗</span></div>
         </div>
       </div>
     </section>
