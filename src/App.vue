@@ -195,40 +195,6 @@ const citation = `@article{liu2026sparkdiffusion,
 
 // Baselines and kernels the demos compare against — same BibTeX style as
 // the primary entry.
-const relatedWork = `@article{zhang2025turbodiffusion,
-  title={TurboDiffusion: Accelerating Video Diffusion Models by 100-200 Times},
-  author={Zhang, Jintao and Zheng, Kaiwen and Jiang, Kai and Wang, Haoxu and Stoica, Ion and Gonzalez, Joseph E and Chen, Jianfei and Zhu, Jun},
-  journal={arXiv preprint arXiv:2512.16093},
-  year={2025}
-}
-
-@inproceedings{zhang2025sageattention,
-  title={SageAttention: Accurate 8-Bit Attention for Plug-and-play Inference Acceleration},
-  author={Zhang, Jintao and Wei, Jia and Zhang, Pengle and Zhu, Jun and Chen, Jianfei},
-  booktitle={International Conference on Learning Representations (ICLR)},
-  year={2025}
-}
-
-@article{zhang2025sla,
-  title={SLA: Beyond Sparsity in Diffusion Transformers via Fine-Tunable Sparse-Linear Attention},
-  author={Zhang, Jintao and Wang, Haoxu and Jiang, Kai and Yang, Shuo and Zheng, Kaiwen and Xi, Haocheng and Wang, Ziteng and Zhu, Hongzhou and Zhao, Min and Stoica, Ion and others},
-  journal={arXiv preprint arXiv:2509.24006},
-  year={2025}
-}
-
-@article{zheng2025rcm,
-  title={Large Scale Diffusion Distillation via Score-Regularized Continuous-Time Consistency},
-  author={Zheng, Kaiwen and Wang, Yuji and Ma, Qianli and Chen, Huayu and Zhang, Jintao and Balaji, Yogesh and Chen, Jianfei and Liu, Ming-Yu and Zhu, Jun and Zhang, Qinsheng},
-  journal={arXiv preprint arXiv:2510.08431},
-  year={2025}
-}
-
-@inproceedings{zhang2024sageattention2,
-  title={Sageattention2: Efficient attention with thorough outlier smoothing and per-thread int4 quantization},
-  author={Zhang, Jintao and Huang, Haofeng and Zhang, Pengle and Wei, Jia and Zhu, Jun and Chen, Jianfei},
-  booktitle={International Conference on Machine Learning (ICML)},
-  year={2025}
-}`
 
 async function copyBibtex(key: string, text: string) {
   try {
@@ -579,18 +545,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           </div>
           <pre><code>{{ citation }}</code></pre>
           <div class="citation-card-foot"><span>PLEASE CITE THIS WORK</span><span>↗</span></div>
-        </div>
-
-        <div class="citation-card citation-card-related">
-          <div class="citation-card-top">
-            <div><span>RELATED WORK / BIBTEX</span></div>
-            <button type="button" class="copy-button" @click="copyBibtex('related', relatedWork)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="8" width="11" height="12" rx="1.5" /><path d="M5 16V5.5A1.5 1.5 0 0 1 6.5 4H16" /></svg>
-              {{ copiedKey === 'related' ? 'Copied' : 'Copy all' }}
-            </button>
-          </div>
-          <pre><code>{{ relatedWork }}</code></pre>
-          <div class="citation-card-foot"><span>BASELINES &amp; KERNELS COMPARED ON THIS PAGE</span><span>↗</span></div>
         </div>
       </div>
     </section>
