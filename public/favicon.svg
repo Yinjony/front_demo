@@ -1,27 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="SD logo">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="S logo">
   <defs>
     <linearGradient id="orange" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ff2f1f"/>
-      <stop offset="0.55" stop-color="#ff5a0a"/>
+      <stop offset="0" stop-color="#ff3020"/>
+      <stop offset="0.55" stop-color="#ff5b0a"/>
       <stop offset="1" stop-color="#ffad20"/>
     </linearGradient>
     <linearGradient id="dark" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#23242a"/>
+      <stop offset="0" stop-color="#25262c"/>
       <stop offset="1" stop-color="#171313"/>
     </linearGradient>
   </defs>
-
-  <!-- D: positioned to preserve the original logo's clear inter-letter gap -->
-  <g transform="translate(38 0) scale(.887 1)">
-    <path fill="url(#orange)" d="M292 55h72c91 0 148 74 148 201S455 457 364 457h-72V55Zm44 54v294h25c64 0 103-53 103-147s-39-147-103-147h-25Z"/>
-    <path fill="url(#dark)" d="M336 109h25c64 0 103 53 103 147s-39 147-103 147h-25V109Z"/>
-  </g>
-
-  <g transform="scale(.81 1)">
-    <!-- S: warm outer ribbon -->
+  <g transform="translate(8 0) scale(1.16 1)">
     <path fill="url(#orange)" d="M187 55C91 55 27 102 27 174c0 77 66 106 137 129 48 16 73 30 73 55 0 30-34 48-88 48-51 0-99-16-149-51v66c48 28 101 42 158 42 99 0 161-45 161-119 0-74-58-105-136-131-50-17-77-30-77-58 0-27 29-43 81-50V55Z"/>
-
-    <!-- S: dark inner stroke -->
     <path fill="url(#dark)" d="M171 106c-62 7-94 31-94 71 0 55 48 76 109 96 48 16 76 33 76 68 0 51-47 78-118 78-40 0-80-10-113-30v-57c35 28 73 42 115 42 42 0 70-13 70-36 0-21-24-31-65-45-65-21-113-47-113-105 0-48 43-76 133-82Z"/>
   </g>
 </svg>

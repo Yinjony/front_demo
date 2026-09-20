@@ -49,6 +49,7 @@ const demoSpecs: DemoModelSpec[] = [
     methods: [
       { folder: 'full_attention', label: 'Full Attention' },
       { folder: 'turbo_diffusion', label: 'Turbo Diffusion', note: '90% sparsity' },
+      { folder: 'fastwan', label: 'FastWan', note: '90% sparsity' },
       { folder: 'ours', label: 'Ours', note: '90% sparsity', ours: true },
     ],
   },
@@ -111,49 +112,79 @@ const modelPrompts = (model: string) => {
   return raw.split(/\r?\n/).filter((line) => line.trim() !== '')
 }
 
-// First (sorted) video of videos-real/<model>/<method>/ — glob keys are
-// sorted paths, so find() yields the alphabetically first file.
-const firstVideoOf = (model: string, method: string) =>
-  Object.entries(allVideos).find(([p]) => p.includes(`/${model}/${method}/`))?.[1]
+// All videos of videos-real/<model>/<method>/ in sorted order — glob keys
+// are sorted paths, so row N pairs the Nth file of every method.
+const videosOf = (model: string, method: string) =>
+  Object.entries(allVideos)
+    .filter(([p]) => p.includes(`/${model}/${method}/`))
+    .map(([, source]) => source)
 
-// First prompt line of videos-real/<model>/prompts.txt.
-const modelPrompt = (model: string) =>
-  modelPrompts(model)[0] || `[ Add the original input prompt for ${model} ]`
+// Prompt line N (0-based) of videos-real/<model>/prompts.txt.
+const modelPrompt = (model: string, index: number) =>
+  modelPrompts(model)[index] || `[ Add the original input prompt for ${model} row ${index + 1} ]`
+
+// Two prompt rows per model card — the Nth row pairs the Nth video of each
+// method with the Nth prompt line.
+const ROWS_PER_MODEL = 2
 
 type DemoCell = { method: string; label: string; note?: string; ours: boolean; source: string }
-type DemoBlock = { folder: string; title: string; prompt: string; cells: DemoCell[] }
+type DemoRow = { prompt: string; cells: DemoCell[] }
+type DemoBlock = { folder: string; title: string; methodLabels: string[]; rows: DemoRow[] }
 
 const demoBlocks: DemoBlock[] = demoSpecs
   .map((spec) => {
-    const cells: DemoCell[] = []
-    const missing: string[] = []
-    for (const method of spec.methods) {
-      const source = firstVideoOf(spec.folder, method.folder)
-      if (source) {
-        cells.push({
-          method: method.folder,
-          label: method.label,
-          note: method.note,
-          ours: method.ours ?? false,
-          source,
-        })
-      } else {
-        missing.push(method.folder)
-      }
-    }
+    const byMethod = spec.methods.map((method) => ({
+      ...method,
+      sources: videosOf(spec.folder, method.folder),
+    }))
     // Videos land in docs/videos-real progressively — surface gaps in the
     // console so a silently half-empty card is easy to spot in dev.
+    const missing = byMethod.filter((m) => m.sources.length === 0).map((m) => m.folder)
     if (missing.length) {
       console.warn(`[demos] ${spec.folder}: no videos found for ${missing.join(', ')}`)
     }
-    return { folder: spec.folder, title: spec.title, prompt: modelPrompt(spec.folder), cells }
+
+    const found = byMethod.filter((m) => m.sources.length > 0)
+    const rowCount = Math.min(
+      ROWS_PER_MODEL,
+      Math.max(0, ...found.map((m) => m.sources.length)),
+    )
+    const rows: DemoRow[] = Array.from({ length: rowCount }, (_, index) => ({
+      prompt: modelPrompt(spec.folder, index),
+      cells: found
+        .filter((m) => m.sources[index])
+        .map((m) => ({
+          method: m.folder,
+          label: m.label,
+          note: m.note,
+          ours: m.ours ?? false,
+          source: m.sources[index],
+        })),
+    }))
+
+    return {
+      folder: spec.folder,
+      title: spec.title,
+      methodLabels: found.map((m) => m.label),
+      rows,
+    }
   })
-  .filter((block) => block.cells.length > 0)
+  .filter((block) => block.rows.length > 0 && block.rows.some((row) => row.cells.length > 0))
+
+// Hero background video — reads the FIRST (sorted) mp4 from the dedicated
+// docs/videos-hero/ folder. Falls back to the first demo video when the
+// folder is empty so the hero never goes blank mid-production.
+const heroVideos = import.meta.glob('../docs/videos-hero/*.mp4', {
+  eager: true,
+  import: 'default',
+}) as Record<string, string>
 
 const heroDemo = (() => {
+  const [heroPath, heroSource] = Object.entries(heroVideos)[0] ?? []
+  if (heroSource) return { label: `Hero · ${heroPath.split('/').pop()}`, source: heroSource }
   for (const spec of demoSpecs) {
     for (const method of spec.methods) {
-      const source = firstVideoOf(spec.folder, method.folder)
+      const source = videosOf(spec.folder, method.folder)[0]
       if (source) return { label: `${spec.folder} / ${method.label}`, source }
     }
   }
@@ -177,11 +208,11 @@ function scrollToId(id: string) {
 }
 
 const citation = `@article{liu2026sparkdiffusion,
-  title   = {SparkDiffusion: Mitigating the High-Sparsity Trap --- A Unified Framework for 200x Single-GPU Acceleration of Visual Generation},
-  author  = {Liu, Yuxi and Li, Haoyu and Zhang, Zekun and Sun, Tengxu and Cai, Yixiang and Li, Jiayong and Xia, Yifei and Ai, Baole and Wang, Ang and Wang, Jiamang and Qu, Lin and Zhang, Kai and Yuan, Kun and Cui, Bin},
+  title   = {SparkDiffusion: Mitigating the High-Sparsity Trap --- A Unified Framework for up to 265x Single-GPU Acceleration of Visual Generation},
+  author  = {Liu, Yuxi and Li, Haoyu and Zhang, Zekun and Sun, Tengxu and Cai, Yixiang and Li, Jiayong and Xia, Yifei and Liu, Tianle and Ai, Baole and Wang, Ang and Wang, Jiamang and Qu, Lin and Zhang, Kai and Yuan, Kun and Cui, Bin},
   journal = {Preprint},
   year    = {2026},
-  url     = {https://SparkDiffusion.com}
+  url     = {https://sparkdiffusion.github.io/}
 }`
 
 // Related work from this group — same BibTeX style as the primary entry.
@@ -281,17 +312,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
       <div class="hero-copy page-width">
         <p class="kicker">ICLR · 2027</p>
-        <h1>SparkDiffusion:<br /><span>Mitigating the High-Sparsity Trap — A Unified Framework for 265× Single-GPU Acceleration of Visual Generation</span></h1>
+        <h1>SparkDiffusion:<br /><span>Mitigating the High-Sparsity Trap — A Unified Framework for up to 265× Single-GPU Acceleration of Visual Generation</span></h1>
         <p class="hero-lede">
           A unified post-training framework — compensated sparse attention, trajectory-mixed
           distillation, and fused FP8 deployment — that turns dense video DiTs into high-sparsity,
           few-step generators with up to 265× measured end-to-end speedup on a single GPU.
         </p>
         <p class="authors">
-          Yuxi Liu<sup>*1,4</sup> <i>·</i> Haoyu Li<sup>*2,4</sup> <i>·</i> Zekun Zhang<sup>*1</sup> <i>·</i> Tengxu Sun<sup>†4</sup> <i>·</i> Yixiang Cai<sup>1</sup> <i>·</i> Jiayong Li<sup>3,4</sup> <i>·</i> Yifei Xia<sup>5</sup> <i>·</i> Baole Ai<sup>4</sup> <i>·</i> Ang Wang<sup>4</sup> <i>·</i> Jiamang Wang<sup>4</sup> <i>·</i> Lin Qu<sup>4</sup> <i>·</i> Kai Zhang<sup>2</sup> <i>·</i> Kun Yuan<sup>†1</sup> <i>·</i> Bin Cui<sup>†5</sup>
+          Yuxi Liu<sup>*1,3</sup> <i>·</i> Haoyu Li<sup>*2,3</sup> <i>·</i> Zekun Zhang<sup>*1</sup> <i>·</i> Tengxu Sun<sup>†3</sup> <i>·</i> Yixiang Cai<sup>1</sup> <i>·</i> Jiayong Li<sup>3,5</sup> <i>·</i> Yifei Xia<sup>6</sup> <i>·</i> Tianle Liu<sup>4</sup> <i>·</i> Baole Ai<sup>3</sup> <i>·</i> Ang Wang<sup>3</sup> <i>·</i> Jiamang Wang<sup>3</sup> <i>·</i> Lin Qu<sup>3</sup> <i>·</i> Kai Zhang<sup>2</sup> <i>·</i> Kun Yuan<sup>†1</sup> <i>·</i> Bin Cui<sup>†6</sup>
         </p>
         <p class="affiliation">
-          <sup>1</sup>Peking University, Melon Group <i>·</i> <sup>2</sup>Tsinghua University <i>·</i> <sup>3</sup>Harbin Institute of Technology <i>·</i> <sup>4</sup>Alibaba Group <i>·</i> <sup>5</sup>Peking University
+          <sup>1</sup>Peking University, Melon Group <i>·</i> <sup>2</sup>Tsinghua University <i>·</i> <sup>3</sup>Alibaba Group <i>·</i> <sup>4</sup>University of Electronic Science and Technology of China <i>·</i> <sup>5</sup>Harbin Institute of Technology <i>·</i> <sup>6</sup>Peking University
         </p>
         <p class="affiliation-note">* Equal contribution &nbsp;·&nbsp; † Corresponding author</p>
       </div>
@@ -323,25 +354,26 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       </div>
       <div class="abstract-copy">
         <p>
-          Video diffusion transformers are central to high-quality visual generation, but their
-          inference cost is dominated by attention over long spatiotemporal token sequences. We
-          identify the <b>high-sparsity trap</b>: at extreme sparsity, step-local objectives may
-          optimize per-step velocities while leaving terminal-visible structural errors. These
-          errors are injected during high-noise structure generation and accumulated by later
-          sampling steps, so low-noise refinement alone is insufficient. To address this, we present
-          <b>SparkDiffusion</b>, a unified framework that converts dense video DiTs into
-          high-sparsity, few-step generators. SparkDiffusion combines compensated sparse attention,
-          trajectory-mixed distillation, and fused FP8 deployment: a short sparse warm-up provides a
-          coarse generative prior, trajectory-mixed distillation combines high-noise structural
-          alignment with low-noise terminal distribution matching, and fused FP8 kernels convert
-          saved computation into wall-clock speedup. Across multiple Wan models, resolutions, and
-          sparsity levels up to 97%, SparkDiffusion maintains strong generation quality while
-          delivering large measured speedups.
+          Video diffusion transformers are expensive because attention dominates long spatiotemporal
+          token sequences. We identify the <b>high-sparsity trap</b>: at extreme attention sparsity,
+          step-local training losses keep decreasing while terminal generation quality stagnates or
+          degrades. The trap is one of supervision: the dominant terminal errors originate in the
+          high-noise structure-generation stage, and terminal-aligned training corrects terminal
+          errors that substantially extended step-local training cannot. This yields a simple
+          staging principle: first adapt the sparse architecture into a coarse prior, then correct
+          the terminal distribution. We instantiate the principle as <b>SparkDiffusion</b>, a
+          unified acceleration framework for visual generation that combines a short sparse warm-up,
+          few-step trajectory-mixed distillation, and FP8 quantization with fused kernels.
+          SparkDiffusion sustains 97% attention sparsity with strong visual quality on long-sequence
+          720P generation across Wan2.1/Wan2.2 backbones and T2V/I2V tasks, and 90% sparsity on
+          Wan2.1-T2V-1.3B-480P. With 3-step CFG-free inference, SparkDiffusion achieves a
+          265× end-to-end speedup over the 50-step CFG dense baseline for Wan2.1-T2V-14B-720P on a
+          single RTX 5090 (220× on H100), and denoises a Wan2.1-T2V-1.3B-480P video in 1.3 s.
         </p>
         <div class="impact-strip" aria-label="Key results from the paper">
-          <div><strong>2 0 0 ×</strong><span>end-to-end speedup on Wan2.2-T2V-720P at 97% attention sparsity</span></div>
-          <div><strong>1 . 6 s</strong><span>per Wan2.1-T2V-1.3B-480P video on a single RTX 5090</span></div>
-          <div><strong>9 7 %</strong><span>attention sparsity with dense-comparable generation quality</span></div>
+          <div><strong>2 6 5 ×</strong><span>end-to-end speedup on Wan2.1-T2V-14B-720P at 97% sparsity · 3-step, RTX 5090 (220× on H100)</span></div>
+          <div><strong>1 . 3 s</strong><span>per Wan2.1-T2V-1.3B-480P video on a single RTX 5090 (0.6 s on H100)</span></div>
+          <div><strong>9 7 %</strong><span>attention sparsity sustained on long-sequence 720P T2V/I2V generation</span></div>
         </div>
       </div>
     </section>
@@ -360,9 +392,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </div>
         <FrameworkDiagram />
         <figcaption class="figure-note">
-          Sparse warm-up provides a coarse prior; trajectory-mixed distillation combines high-noise
-          structural alignment with low-noise distribution matching; FP8 quantization with fused
-          kernels converts saved computation into inference speedup.
+          Two post-training stages and one deployment step. Sparse warm-up adapts the dense backbone
+          into a coarse prior; trajectory-mixed distillation corrects the terminal distribution with
+          high-noise PCM-style consistency and low-noise DMD-style distribution matching (3-step
+          student: one PCM step + two DMD steps); FP8 quantization with fused kernels converts the
+          saved computation into wall-clock speedup. Default instantiation: RoLA as the sparse
+          module, the CrossDistill schedule for distillation.
         </figcaption>
       </figure>
     </section>
@@ -382,9 +417,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </div>
 
         <div class="figure-strip" aria-label="Headline speedup numbers">
-          <div><strong>265×</strong><span>max measured speedup · Wan2.1-T2V-14B-720P @ 97% · RTX 5090</span></div>
-          <div><strong>220×</strong><span>Wan2.1-T2V-14B-720P @ 97% · H100</span></div>
-          <div><strong>200×</strong><span>Wan2.2-T2V-720P @ 97% sparsity</span></div>
+          <div><strong>265×</strong><span>max measured speedup · Wan2.1-T2V-14B-720P @ 97% · 3-step · RTX 5090</span></div>
+          <div><strong>220×</strong><span>Wan2.1-T2V-14B-720P @ 97% · 3-step · H100</span></div>
+          <div><strong>189×</strong><span>Wan2.2-T2V-A14B-720P @ 97% sparsity · H100</span></div>
         </div>
 
         <div class="chart-duo chart-duo-stack">
@@ -405,10 +440,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </div>
 
         <figcaption class="figure-note">
-          Suffixes 90 / 97 denote attention sparsity. Speedup = Full Attention latency ÷
-          SparkDiffusion latency, rounded to the nearest integer. Wan2.2 RTX 5090 latency includes
-          high-noise / low-noise expert switching overhead; on H100 both experts stay resident, so
-          no switching cost is incurred.
+          Suffixes 90 / 97 denote attention sparsity. Full Attention = 50-step CFG (NFE 100) in
+          BF16 with FlashAttention; SparkDiffusion = 3-step CFG-free (NFE 3) with the full stack.
+          Speedup = Full Attention latency ÷ SparkDiffusion latency, rounded to the nearest
+          integer. Wan2.2 RTX 5090 latency includes high-noise / low-noise expert switching
+          overhead; on H100 both experts stay resident, so no switching cost is incurred.
         </figcaption>
       </figure>
 
@@ -420,18 +456,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </div>
         <EChart :option="trapOpt" height="340px" />
         <figcaption class="figure-note">
-          Oracle correction on Wan2.1-T2V-14B: replacing the sparse student's velocity with the
-          dense teacher's on a matched noise window. High-noise correction recovers most of the
-          terminal gap; low-noise correction yields limited gain — the dominant failure is injected
-          during high-noise structure generation and accumulated by later steps.
+          Oracle correction on Wan2.1-T2V-14B-480P (50-step sampler, 32 prompts × 4 seeds):
+          replacing the sparse student's velocity with the dense teacher's inside one matched noise
+          window. At 97% sparsity, fixing the five highest-noise steps removes most of the terminal
+          error while fixing the five lowest-noise steps leaves it essentially unchanged — the
+          dominant failure is injected during high-noise structure generation and accumulated by
+          later steps.
         </figcaption>
       </figure>
 
-      <!-- Quality (paper Table 1) -->
+      <!-- Quality (paper Table 2) -->
       <figure class="figure-card">
         <div class="figure-head">
           <h3>Generation quality — VBench &amp; VBench-2.0</h3>
-          <span class="figure-tag">Table 1</span>
+          <span class="figure-tag">Table 2</span>
         </div>
 
         <div class="chart-duo">
@@ -465,7 +503,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               <template v-for="model in qualityModels" :key="model">
                 <tr
                   v-for="(row, i) in qualityRows.filter((r) => r.model === model)"
-                  :key="model + row.method"
+                  :key="model + row.method + row.sparsity"
                   :class="{ 'is-ours': row.method === 'SparkDiffusion', 'is-first': i === 0 }"
                 >
                   <td v-if="i === 0" :rowspan="qualityRows.filter((r) => r.model === model).length">{{ model }}</td>
@@ -486,9 +524,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
         <figcaption class="figure-note">
           Wan2.1-T2V-1.3B evaluated at 480 × 832; Wan2.1-T2V-14B and Wan2.2-T2V-A14B at
-          720 × 1280, all with 81-frame generation. Higher is better. At up to 97% sparsity,
-          SparkDiffusion stays within ~0.9 VBench points of the dense baseline while running
-          orders of magnitude faster, and exceeds both baselines on VBench-2.0 Human Fidelity.
+          720 × 1280, all with 81-frame generation. Baselines run at their strongest official
+          configuration (90% sparsity); SparkDiffusion rows are measured with the full deployment
+          stack (W8A8 FP8 with fused kernels) active. At matched 90% sparsity, SparkDiffusion
+          improves over all baselines on every reported metric on Wan2.1-T2V-14B-720P; pushed to
+          97% it stays within ~0.9 VBench points of the dense baseline while running orders of
+          magnitude faster, and exceeds every baseline on VBench-2.0 Human Fidelity.
         </figcaption>
       </figure>
     </section>
@@ -508,34 +549,40 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       >
         <div class="model-head">
           <h3 class="model-title">{{ block.title }}</h3>
-          <span class="model-methods">{{ block.cells.map((cell) => cell.label).join(' · ') }}</span>
+          <span class="model-methods">{{ block.methodLabels.join(' · ') }}</span>
         </div>
 
-        <p class="model-prompt">{{ block.prompt }}</p>
+        <div v-for="(row, rowIndex) in block.rows" :key="block.folder + rowIndex" class="model-row">
+          <p class="model-prompt">{{ row.prompt }}</p>
 
-        <!-- Column count follows the method count (2–4) via --cols; the media
-             queries below still collapse it to 2 / 1 columns on small screens. -->
-        <div class="demo-row-videos" :style="{ '--cols': block.cells.length }">
-          <figure v-for="cell in block.cells" :key="block.folder + cell.method" class="video-card">
-            <div class="demo-frame">
-              <video :src="cell.source" autoplay muted loop playsinline preload="metadata"></video>
-              <button
-                type="button"
-                class="expand-button"
-                :aria-label="`Expand ${cell.label} video — ${block.prompt}`"
-                :title="cell.label"
-                @click.stop="openVideo({ id: block.folder + cell.method, label: `${block.title} · ${cell.label}`, source: cell.source, prompt: block.prompt })"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
-                  <path d="M15 3h6v6M21 3l-7 7M9 21H3v-6M3 21l7-7" />
-                </svg>
-              </button>
-            </div>
-            <figcaption class="vid-meta" :class="{ 'is-ours': cell.ours }">
-              <span class="t">{{ cell.label }}</span>
-              <span v-if="cell.note" class="r">{{ cell.note }}</span>
-            </figcaption>
-          </figure>
+          <!-- Column count follows the method count (2–4) via --cols; the media
+               queries below still collapse it to 2 / 1 columns on small screens. -->
+          <div class="demo-row-videos" :style="{ '--cols': row.cells.length }">
+            <figure
+              v-for="cell in row.cells"
+              :key="block.folder + rowIndex + cell.method"
+              class="video-card"
+            >
+              <div class="demo-frame">
+                <video :src="cell.source" autoplay muted loop playsinline preload="metadata"></video>
+                <button
+                  type="button"
+                  class="expand-button"
+                  :aria-label="`Expand ${cell.label} video — ${row.prompt}`"
+                  :title="cell.label"
+                  @click.stop="openVideo({ id: block.folder + rowIndex + cell.method, label: `${block.title} · ${cell.label}`, source: cell.source, prompt: row.prompt })"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
+                    <path d="M15 3h6v6M21 3l-7 7M9 21H3v-6M3 21l7-7" />
+                  </svg>
+                </button>
+              </div>
+              <figcaption class="vid-meta" :class="{ 'is-ours': cell.ours }">
+                <span class="t">{{ cell.label }}</span>
+                <span v-if="cell.note" class="r">{{ cell.note }}</span>
+              </figcaption>
+            </figure>
+          </div>
         </div>
       </div>
     </section>

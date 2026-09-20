@@ -10,8 +10,10 @@ import {
   headline,
   latencyRows,
   qualityRows,
+  sparkRowOf,
   trapPanels,
   type LatencyRow,
+  type QualityRow,
 } from './data/paperData'
 
 const INK = '#e8ecff'
@@ -294,11 +296,12 @@ export function trapOption(): EChartsOption {
   }
 }
 
-/* ----- Table 1 — VBench total, zoomed to show near-losslessness ------------- */
+/* ----- Table 2 — VBench total, zoomed to show near-losslessness ------------- */
 export function vbenchOption(): EChartsOption {
   const models = [...new Set(qualityRows.map((r) => r.model))]
-  const by = (method: string) =>
+  const by = (method: QualityRow['method']) =>
     models.map((m) => qualityRows.find((r) => r.model === m && r.method === method)?.vbench ?? null)
+  const spark = models.map((m) => sparkRowOf(m).vbench)
   const fmt = (v: number | null | undefined) => (v == null ? '–' : v.toFixed(2))
 
   return {
@@ -337,15 +340,23 @@ export function vbenchOption(): EChartsOption {
       {
         name: 'Full Attention',
         type: 'bar',
-        barWidth: 22,
+        barWidth: 16,
         itemStyle: { color: FA_H100, borderRadius: [2, 2, 0, 0] },
         data: by('Full').map((v) => ({ value: v, label: { formatter: fmt(v) } })),
         label: { show: true, position: 'top', color: QUIET, fontFamily: MONO, fontSize: 10 },
       },
       {
+        name: 'FastWan (VSA)',
+        type: 'bar',
+        barWidth: 16,
+        itemStyle: { color: 'rgba(148, 158, 190, .75)', borderRadius: [2, 2, 0, 0] },
+        data: by('FastWan (VSA)').map((v) => ({ value: v, label: { formatter: fmt(v) } })),
+        label: { show: true, position: 'top', color: QUIET, fontFamily: MONO, fontSize: 10 },
+      },
+      {
         name: 'TurboDiffusion',
         type: 'bar',
-        barWidth: 22,
+        barWidth: 16,
         itemStyle: { color: 'rgba(157, 123, 255, .55)', borderRadius: [2, 2, 0, 0] },
         data: by('TurboDiffusion').map((v) => ({ value: v, label: { formatter: fmt(v) } })),
         label: { show: true, position: 'top', color: QUIET, fontFamily: MONO, fontSize: 10 },
@@ -353,18 +364,19 @@ export function vbenchOption(): EChartsOption {
       {
         name: 'SparkDiffusion',
         type: 'bar',
-        barWidth: 22,
+        barWidth: 16,
         itemStyle: { color: SIGNAL, borderRadius: [2, 2, 0, 0] },
-        data: by('SparkDiffusion').map((v) => ({ value: v, label: { formatter: fmt(v), color: INK } })),
+        data: spark.map((v) => ({ value: v, label: { formatter: fmt(v), color: INK } })),
         label: { show: true, position: 'top', color: INK, fontFamily: MONO, fontSize: 10 },
       },
     ],
   }
 }
 
-/* ----- Table 1 — VBench-2.0 capability radar (Wan2.1-T2V-14B) --------------- */
+/* ----- Table 2 — VBench-2.0 capability radar (Wan2.1-T2V-14B) --------------- */
 export function radarOption(): EChartsOption {
-  const pick = (m: string) => qualityRows.find((r) => r.model === 'Wan2.1-T2V-14B' && r.method === m)!
+  const pick = (m: QualityRow['method']) => qualityRows.find((r) => r.model === 'Wan2.1-T2V-14B' && r.method === m)!
+  const spark = sparkRowOf('Wan2.1-T2V-14B')
   const keys = ['creativity', 'commonsense', 'controllability', 'humanFidelity', 'physics'] as const
   const indicators = [
     { name: 'Creativity', min: 25, max: 90 },
@@ -406,6 +418,13 @@ export function radarOption(): EChartsOption {
             areaStyle: { color: 'rgba(148, 158, 190, .08)' },
           },
           {
+            name: 'FastWan (VSA)',
+            value: keys.map((k) => pick('FastWan (VSA)')[k]),
+            lineStyle: { color: 'rgba(148, 158, 190, .75)', width: 1.6 },
+            itemStyle: { color: 'rgba(148, 158, 190, .75)' },
+            areaStyle: { color: 'rgba(148, 158, 190, .06)' },
+          },
+          {
             name: 'TurboDiffusion',
             value: keys.map((k) => pick('TurboDiffusion')[k]),
             lineStyle: { color: 'rgba(157, 123, 255, .8)', width: 1.6 },
@@ -413,8 +432,8 @@ export function radarOption(): EChartsOption {
             areaStyle: { color: 'rgba(157, 123, 255, .06)' },
           },
           {
-            name: 'SparkDiffusion',
-            value: keys.map((k) => pick('SparkDiffusion')[k]),
+            name: `SparkDiffusion (${spark.sparsity})`,
+            value: keys.map((k) => spark[k]),
             lineStyle: { color: SIGNAL, width: 1.6 },
             itemStyle: { color: SIGNAL },
             areaStyle: { color: 'rgba(77, 139, 255, .10)' },

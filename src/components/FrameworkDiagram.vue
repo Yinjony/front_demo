@@ -39,7 +39,7 @@
         <header><span class="fw-index">1</span> Sparse Warm-up</header>
         <div class="fw-boxes">
           <div class="fw-box">
-            <h4>Compensated sparse attention</h4>
+            <h4>Compensated sparse attention <span class="fw-src">RoLA</span></h4>
             <ul class="fw-branches">
               <li>Sparse branch <span>top-k blocks</span></li>
               <li>Compensation branch <span>low-rank linear</span></li>
@@ -54,7 +54,7 @@
 
       <!-- Stage 2: trajectory-mixed distillation -->
       <section class="fw-stage" aria-label="Trajectory-mixed distillation">
-        <header><span class="fw-index">2</span> Trajectory-Mixed Distillation</header>
+        <header><span class="fw-index">2</span> Trajectory-Mixed Distillation <span class="fw-src">CrossDistill</span></header>
         <div class="fw-boxes">
           <div class="fw-box fw-box-traj">
             <div class="fw-traj-labels"><span>t = 1</span><span>t<sub>c</sub></span><span>t = 0</span></div>
@@ -66,14 +66,14 @@
           <div class="fw-duo">
             <div class="fw-box">
               <h4>Structure</h4>
-              <p>consistency / flow matching on teacher trajectory</p>
+              <p>PCM-style consistency on teacher trajectory</p>
             </div>
             <div class="fw-box">
               <h4>Fidelity</h4>
-              <p>distribution matching · critic vs teacher scores</p>
+              <p>DMD-style distribution matching</p>
             </div>
           </div>
-          <div class="fw-note fw-note-step">multi-step sparse <b>→</b> few-step sparse</div>
+          <div class="fw-note fw-note-step">multi-step sparse <b>→</b> 3-step sparse · 1 PCM + 2 DMD</div>
         </div>
       </section>
 
@@ -169,6 +169,19 @@
   border-radius: 50%;
   color: var(--signal);
   font-size: .62rem;
+}
+
+/* Source-implementation tag — the paper's default instantiation names
+   (RoLA sparse module, CrossDistill distillation schedule). */
+.fw-src {
+  margin-left: auto;
+  padding: .12rem .34rem;
+  border: 1px solid rgba(157, 123, 255, .4);
+  border-radius: 4px;
+  color: rgba(157, 123, 255, .9);
+  font: 500 .56rem/1 'DM Mono', monospace;
+  letter-spacing: .1em;
+  text-transform: uppercase;
 }
 
 .fw-boxes {

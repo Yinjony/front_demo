@@ -727,9 +727,10 @@ h2 {
 }
 
 /* ===== Per-model demo blocks =================================================
-   Each block: model title + method strip → one prompt → one row of method
-   videos (NVIDIA Sol-Engine comparison style). The video row's column count
-   follows the method count (2–4) via --cols, set inline per block. */
+   Each block: model title + method strip → two prompt rows, each pairing a
+   prompt with one row of method videos (NVIDIA Sol-Engine comparison style).
+   Each video row's column count follows the method count (2–4) via --cols,
+   set inline per row. */
 
 .model-block {
   margin-top: clamp(3rem, 6vw, 5rem);
@@ -766,7 +767,12 @@ h2 {
   text-transform: uppercase;
 }
 
-/* The block's single prompt, quoted above the videos it generated. */
+/* One prompt row: quote above the videos it generated. Blocks hold two of
+   these; the second sits a clear step below the first. */
+.model-row + .model-row {
+  margin-top: clamp(1.6rem, 3vw, 2.4rem);
+}
+
 .model-prompt {
   margin: 1.15rem 0;
   padding-left: 1rem;
