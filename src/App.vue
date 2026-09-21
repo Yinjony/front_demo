@@ -67,8 +67,8 @@ const demoSpecs: DemoModelSpec[] = [
     folder: 'Wan2.1-I2V-14B-720P-95',
     methods: [
       { folder: 'full_attention', label: 'Full Attention' },
-      { folder: 'ours_top0.05', label: 'Ours (top 5%)', note: '95% sparsity', ours: true },
-      { folder: 'ours_top0.1', label: 'Ours (top 10%)', note: '97% sparsity', ours: true },
+      // { folder: 'ours_top0.05', label: 'Ours (top 5%)', note: '95% sparsity', ours: true },
+      { folder: 'ours_top0.03', label: 'Ours (top 3%)', note: '97% sparsity', ours: true },
     ],
   },
   {
