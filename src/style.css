@@ -794,14 +794,21 @@ h2 {
    "Ours" gets the signal-blue accent, same vocabulary as the impact strip. */
 .vid-meta {
   display: flex;
-  gap: .8rem;
-  align-items: baseline;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: .55rem;
   padding-top: .65rem;
   color: var(--ink);
   letter-spacing: .1em;
   font: 500 .72rem/1.2 'DM Mono', monospace;
   text-transform: uppercase;
+}
+
+.vid-primary {
+  display: flex;
+  gap: .8rem;
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
 }
 
 .vid-meta .r {
@@ -812,6 +819,46 @@ h2 {
 .vid-meta.is-ours .t {
   color: var(--signal);
   text-shadow: 0 0 16px rgba(77, 139, 255, .5);
+}
+
+.vid-meta.is-ours .r {
+  color: var(--signal);
+}
+
+.vid-latency {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem .6rem;
+  color: var(--quiet);
+  font-size: .68rem;
+  letter-spacing: .08em;
+  line-height: 1.3;
+  text-transform: none;
+}
+
+.vid-latency span {
+  padding: .34rem .52rem;
+  border: 1px solid rgba(232, 236, 255, .12);
+  border-radius: .3rem;
+  background: rgba(232, 236, 255, .035);
+}
+
+.vid-latency strong {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.vid-meta.is-ours .vid-latency {
+  color: rgba(132, 173, 255, .86);
+}
+
+.vid-meta.is-ours .vid-latency span {
+  border-color: rgba(77, 139, 255, .34);
+  background: rgba(77, 139, 255, .08);
+}
+
+.vid-meta.is-ours .vid-latency strong {
+  color: var(--signal);
 }
 
 /* Method tag pinned to each video's bottom-left — same mono-chip vocabulary

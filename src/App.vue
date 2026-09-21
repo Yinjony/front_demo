@@ -34,7 +34,14 @@ const radarOpt = radarOption()
 
 const qualityModels = [...new Set(qualityRows.map((r) => r.model))]
 
-type DemoMethodSpec = { folder: string; label: string; note?: string; ours?: boolean }
+type DemoLatency = { h100: string; rtx5090: string }
+type DemoMethodSpec = {
+  folder: string
+  label: string
+  note?: string
+  ours?: boolean
+  latency: DemoLatency
+}
 type DemoModelSpec = { folder: string; title: string; methods: DemoMethodSpec[] }
 
 // One card per model (NVIDIA Sol-Engine style): title + method strip → one
@@ -47,46 +54,46 @@ const demoSpecs: DemoModelSpec[] = [
     title: 'Wan2.1-T2V-1.3B · 480P · 3 Steps',
     folder: 'Wan2.1-T2V-1.3B-480P-90',
     methods: [
-      { folder: 'full_attention', label: 'Full Attention' },
-      { folder: 'turbo_diffusion', label: 'Turbo Diffusion', note: '90% sparsity · 3 Steps' },
-      { folder: 'fastwan', label: 'FastWan', note: '90% sparsity · 3 Steps' },
-      { folder: 'ours', label: 'Ours', note: '90% sparsity · 3 Steps', ours: true },
+      { folder: 'full_attention', label: 'Full Attention', latency: { h100: '92 s', rtx5090: '182 s' } },
+      { folder: 'turbo_diffusion', label: 'Turbo Diffusion', note: '90% sparsity · 3 Steps', latency: { h100: '1 s', rtx5090: '2 s' } },
+      { folder: 'fastwan', label: 'FastWan', note: '90% sparsity · 3 Steps', latency: { h100: '1.2 s', rtx5090: '2.8 s' } },
+      { folder: 'ours', label: 'Ours', note: '90% sparsity · 3 Steps', ours: true, latency: { h100: '0.6 s', rtx5090: '1.3 s' } },
     ],
   },
   {
     title: 'Wan2.1-T2V-14B · 480P',
     folder: 'Wan2.1-T2V-14B-480P-90',
     methods: [
-      { folder: 'full_attention', label: 'Full Attention' },
-      { folder: 'turbo_diffusion', label: 'Turbo Diffusion', note: '90% sparsity' },
-      { folder: 'ours', label: 'Ours', note: '90% sparsity', ours: true },
+      { folder: 'full_attention', label: 'Full Attention', latency: { h100: '460 s', rtx5090: '1674 s' } },
+      { folder: 'turbo_diffusion', label: 'Turbo Diffusion', note: '90% sparsity', latency: { h100: '6.2 s', rtx5090: '10.2 s' } },
+      { folder: 'ours', label: 'Ours', note: '90% sparsity', ours: true, latency: { h100: '3.6 s', rtx5090: '8.3 s' } },
     ],
   },
   {
     title: 'Wan2.1-I2V-14B · 720P',
     folder: 'Wan2.1-I2V-14B-720P-95',
     methods: [
-      { folder: 'full_attention', label: 'Full Attention' },
+      { folder: 'full_attention', label: 'Full Attention', latency: { h100: '1757 s', rtx5090: '4769 s' } },
       // { folder: 'ours_top0.05', label: 'Ours (top 5%)', note: '95% sparsity', ours: true },
-      { folder: 'ours_top0.03', label: 'Ours (top 3%)', note: '97% sparsity', ours: true },
+      { folder: 'ours_top0.03', label: 'Ours (top 3%)', note: '97% sparsity', ours: true, latency: { h100: '8 s', rtx5090: '18 s' } },
     ],
   },
   {
     title: 'Wan2.1-T2V-14B · 720P · 3 Steps',
     folder: 'Wan2.1-T2V-720p-3steps',
     methods: [
-      { folder: 'full_attention', label: 'Full Attention' },
-      { folder: 'turbo_diffusion', label: 'Turbo Diffusion', note: '90% · 3 steps' },
-      { folder: 'fastwan', label: 'FastWan', note: '90% · 3 steps' },
-      { folder: 'ours', label: 'Ours', note: '97% · 3 steps', ours: true },
+      { folder: 'full_attention', label: 'Full Attention', latency: { h100: '1757 s', rtx5090: '4769 s' } },
+      { folder: 'turbo_diffusion', label: 'Turbo Diffusion', note: '90% · 3 steps', latency: { h100: '16 s', rtx5090: '25.3 s' } },
+      { folder: 'fastwan', label: 'FastWan', note: '90% · 3 steps', latency: { h100: '20.5 s', rtx5090: '54.1 s' } },
+      { folder: 'ours', label: 'Ours', note: '97% · 3 steps', ours: true, latency: { h100: '8 s', rtx5090: '18 s' } },
     ],
   },
   {
     title: 'Wan2.2-T2V-A14B · 720P',
     folder: 'Wan2.2-T2V-A14B-720P-97',
     methods: [
-      { folder: 'full_attention', label: 'Full Attention' },
-      { folder: 'ours', label: 'Ours', note: '97% sparsity', ours: true },
+      { folder: 'full_attention', label: 'Full Attention', latency: { h100: '1508 s', rtx5090: '4545 s' } },
+      { folder: 'ours', label: 'Ours', note: '97% sparsity', ours: true, latency: { h100: '8 s', rtx5090: '25.1 s' } },
     ],
   },
 ]
@@ -127,7 +134,7 @@ const modelPrompt = (model: string, index: number) =>
 // method with the Nth prompt line.
 const ROWS_PER_MODEL = 2
 
-type DemoCell = { method: string; label: string; note?: string; ours: boolean; source: string }
+type DemoCell = { method: string; label: string; note?: string; ours: boolean; latency: DemoLatency; source: string }
 type DemoRow = { prompt: string; cells: DemoCell[] }
 type DemoBlock = { folder: string; title: string; methodLabels: string[]; rows: DemoRow[] }
 
@@ -158,6 +165,7 @@ const demoBlocks: DemoBlock[] = demoSpecs
           label: m.label,
           note: m.note,
           ours: m.ours ?? false,
+          latency: m.latency,
           source: m.sources[index],
         })),
     }))
@@ -578,8 +586,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 </button>
               </div>
               <figcaption class="vid-meta" :class="{ 'is-ours': cell.ours }">
-                <span class="t">{{ cell.label }}</span>
-                <span v-if="cell.note" class="r">{{ cell.note }}</span>
+                <div class="vid-primary">
+                  <span class="t">{{ cell.label }}</span>
+                  <span v-if="cell.note" class="r">{{ cell.note }}</span>
+                </div>
+                <div class="vid-latency" aria-label="Inference latency">
+                  <span>H100 <strong>{{ cell.latency.h100 }}</strong></span>
+                  <span>RTX 5090 <strong>{{ cell.latency.rtx5090 }}</strong></span>
+                </div>
               </figcaption>
             </figure>
           </div>
