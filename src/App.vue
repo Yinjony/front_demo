@@ -44,13 +44,13 @@ type DemoModelSpec = { folder: string; title: string; methods: DemoMethodSpec[] 
 // videos-real/<folder>/prompts.txt.
 const demoSpecs: DemoModelSpec[] = [
   {
-    title: 'Wan2.1-T2V-1.3B · 480P',
+    title: 'Wan2.1-T2V-1.3B · 480P · 3 Steps',
     folder: 'Wan2.1-T2V-1.3B-480P-90',
     methods: [
       { folder: 'full_attention', label: 'Full Attention' },
-      { folder: 'turbo_diffusion', label: 'Turbo Diffusion', note: '90% sparsity' },
-      { folder: 'fastwan', label: 'FastWan', note: '90% sparsity' },
-      { folder: 'ours', label: 'Ours', note: '90% sparsity', ours: true },
+      { folder: 'turbo_diffusion', label: 'Turbo Diffusion', note: '90% sparsity · 3 Steps' },
+      { folder: 'fastwan', label: 'FastWan', note: '90% sparsity · 3 Steps' },
+      { folder: 'ours', label: 'Ours', note: '90% sparsity · 3 Steps', ours: true },
     ],
   },
   {
@@ -68,7 +68,7 @@ const demoSpecs: DemoModelSpec[] = [
     methods: [
       { folder: 'full_attention', label: 'Full Attention' },
       { folder: 'ours_top0.05', label: 'Ours (top 5%)', note: '95% sparsity', ours: true },
-      { folder: 'ours_top0.1', label: 'Ours (top 10%)', note: '90% sparsity', ours: true },
+      { folder: 'ours_top0.1', label: 'Ours (top 10%)', note: '97% sparsity', ours: true },
     ],
   },
   {
@@ -78,7 +78,7 @@ const demoSpecs: DemoModelSpec[] = [
       { folder: 'full_attention', label: 'Full Attention' },
       { folder: 'turbo_diffusion', label: 'Turbo Diffusion', note: '90% · 3 steps' },
       { folder: 'fastwan', label: 'FastWan', note: '90% · 3 steps' },
-      { folder: 'ours', label: 'Ours', note: '95% · 3 steps', ours: true },
+      { folder: 'ours', label: 'Ours', note: '97% · 3 steps', ours: true },
     ],
   },
   {
